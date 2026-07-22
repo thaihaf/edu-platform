@@ -46,6 +46,14 @@ Base path: `/api/v1`
 - PATCH `/questions/{question_id}/review`
 - POST `/questions/{question_id}/re-evaluate`
 
+## Phase 8 question engine
+`POST /projects/{project_id}/question-generation-jobs` requires `Idempotency-Key` and returns
+`202` after persisting a job; it never runs generation in the request. Poll job state/events at
+`/question-generation-jobs/{id}` and `/events`. Question-bank, version, validation, publication,
+draft-copy/rollback, question review/revision/citation, and duplicate-cluster endpoints follow
+the `/api/v1` contracts in the Phase 8 specification. Raw prompts and vendor responses are not
+returned.
+
 ## Evaluation
 
 - POST `/projects/{id}/evaluate`
