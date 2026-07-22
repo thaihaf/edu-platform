@@ -1,0 +1,9 @@
+FROM python:3.12-slim
+
+WORKDIR /app
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+COPY pyproject.toml README.md ./
+RUN pip install --no-cache-dir .
+COPY apps ./apps
+COPY packages ./packages
+CMD ["celery", "--app", "apps.worker.worker.celery_app:celery_app", "worker", "--loglevel=INFO"]
