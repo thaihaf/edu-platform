@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Mapping
 from typing import Protocol
 from uuid import UUID
 
@@ -7,9 +8,12 @@ from packages.domain.models import (
     AuditEvent,
     Course,
     CourseVersion,
+    IngestionJob,
     ResearchProject,
     Source,
+    SourceChunk,
     SourceSnapshot,
+    StructuredDocument,
     Workspace,
 )
 
@@ -54,6 +58,48 @@ class CourseVersionRepository(Protocol):
 
 class AuditEventRepository(Protocol):
     async def append(self, entity: AuditEvent) -> None: ...
+
+
+class ObjectStorage(Protocol):
+    async def put_object(
+        self, key: str, content: AsyncIterator[bytes], metadata: Mapping[str, str]
+    ) -> None: ...
+    async def get_object(self, key: str) -> AsyncIterator[bytes]: ...
+    async def delete_object(self, key: str) -> None: ...
+    async def object_exists(self, key: str) -> bool: ...
+    async def get_object_metadata(self, key: str) -> Mapping[str, str]: ...
+
+
+class DocumentParser(Protocol):
+    async def parse(
+        self, content: bytes, mime_type: str, filename: str | None = None
+    ) -> StructuredDocument: ...
+
+
+class EmbeddingProvider(Protocol):
+    @property
+    def model_name(self) -> str: ...
+    @property
+    def vector_dimension(self) -> int: ...
+    async def embed_texts(self, texts: list[str]) -> list[list[float]]: ...
+
+
+class ChunkRepository(Protocol):
+    async def create_chunks(self, chunks: list[SourceChunk]) -> None: ...
+    async def list_by_snapshot(self, snapshot_id: UUID) -> list[SourceChunk]: ...
+    async def existing_hashes(self, snapshot_id: UUID) -> set[str]: ...
+
+
+class IngestionJobRepository(Protocol):
+    async def create(self, job: IngestionJob, request_hash: str) -> IngestionJob: ...
+    async def get(self, job_id: UUID) -> IngestionJob | None: ...
+    async def get_by_idempotency_key(self, key: str) -> IngestionJob | None: ...
+    async def update(self, job: IngestionJob) -> None: ...
+    async def get_resumable_job(self, job_id: UUID) -> IngestionJob | None: ...
+
+
+class ProgressEventPublisher(Protocol):
+    async def publish(self, job: IngestionJob) -> None: ...
 
 
 class UnitOfWork(Protocol):

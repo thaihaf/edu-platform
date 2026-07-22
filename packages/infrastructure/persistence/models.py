@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 
-from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, UniqueConstraint
+from sqlalchemy import JSON, DateTime, ForeignKey, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.types import Uuid
 
@@ -103,3 +103,49 @@ class AuditEventRow(Base):
     metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
     occurred_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     trace_id: Mapped[str] = mapped_column(String(100))
+
+
+class IngestionJobRow(Base):
+    __tablename__ = "ingestion_jobs"
+    __table_args__ = (UniqueConstraint("idempotency_key", name="uq_ingestion_job_idempotency"),)
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("research_projects.id"), index=True)
+    source_id: Mapped[UUID] = mapped_column(ForeignKey("sources.id"))
+    source_snapshot_id: Mapped[UUID | None] = mapped_column(ForeignKey("source_snapshots.id"))
+    input_type: Mapped[str] = mapped_column(String(16))
+    status: Mapped[str] = mapped_column(String(16), index=True)
+    stage: Mapped[str] = mapped_column(String(16))
+    progress_percent: Mapped[int] = mapped_column(Integer)
+    retry_count: Mapped[int] = mapped_column(Integer)
+    max_retries: Mapped[int] = mapped_column(Integer)
+    error_code: Mapped[str | None] = mapped_column(String(100))
+    error_message: Mapped[str | None] = mapped_column(Text)
+    idempotency_key: Mapped[str] = mapped_column(String(255))
+    trace_id: Mapped[str] = mapped_column(String(100))
+    started_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    completed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    failed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SourceChunkRow(Base):
+    __tablename__ = "source_chunks"
+    __table_args__ = (
+        UniqueConstraint("source_snapshot_id", "chunk_hash", name="uq_chunk_snapshot_hash"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    source_snapshot_id: Mapped[UUID] = mapped_column(ForeignKey("source_snapshots.id"), index=True)
+    chunk_index: Mapped[int] = mapped_column(Integer)
+    text: Mapped[str] = mapped_column(Text)
+    page_start: Mapped[int | None] = mapped_column(Integer)
+    page_end: Mapped[int | None] = mapped_column(Integer)
+    section_path: Mapped[dict] = mapped_column(JSON)
+    heading: Mapped[str | None] = mapped_column(String(500))
+    token_count: Mapped[int] = mapped_column(Integer)
+    chunk_hash: Mapped[str] = mapped_column(String(64))
+    embedding_json: Mapped[dict | None] = mapped_column(JSON)
+    embedding_model: Mapped[str | None] = mapped_column(String(255))
+    embedding_dimension: Mapped[int | None] = mapped_column(Integer)
+    metadata_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

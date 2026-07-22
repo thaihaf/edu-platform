@@ -15,9 +15,13 @@ dependencies = [
   "asyncpg>=0.30,<1",
   "alembic>=1.14,<2",
   "uvicorn[standard]>=0.32,<1",
+  "python-multipart>=0.0.18,<1",
+  "minio>=7.2,<8",
+  "pgvector>=0.3,<1",
 ]
 
 [project.optional-dependencies]
+docling = ["docling>=2,<3"]
 dev = [
   "httpx>=0.28,<1",
   "mypy>=1.13,<2",
@@ -47,6 +51,10 @@ exclude = ["starter"]
 
 [[tool.mypy.overrides]]
 module = ["celery.*"]
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["docling.*"]
 ignore_missing_imports = true
 
 [[tool.mypy.overrides]]

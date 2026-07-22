@@ -37,6 +37,136 @@ class InvalidStateTransitionError(DomainError):
     pass
 
 
+class IngestionStatus(StrEnum):
+    PENDING = "PENDING"
+    RUNNING = "RUNNING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    CANCELLED = "CANCELLED"
+
+
+class IngestionStage(StrEnum):
+    REGISTERING = "REGISTERING"
+    STORING = "STORING"
+    HASHING = "HASHING"
+    PARSING = "PARSING"
+    CHUNKING = "CHUNKING"
+    EMBEDDING = "EMBEDDING"
+    PERSISTING = "PERSISTING"
+    COMPLETED = "COMPLETED"
+
+
+class InputType(StrEnum):
+    TEXT = "TEXT"
+    FILE = "FILE"
+    URL = "URL"
+
+
+@dataclass
+class IngestionJob:
+    project_id: UUID
+    source_id: UUID
+    source_snapshot_id: UUID | None
+    input_type: InputType
+    idempotency_key: str
+    trace_id: str
+    request_hash: str | None = None
+    status: IngestionStatus = IngestionStatus.PENDING
+    stage: IngestionStage = IngestionStage.REGISTERING
+    progress_percent: int = 0
+    retry_count: int = 0
+    max_retries: int = 3
+    error_code: str | None = None
+    error_message: str | None = None
+    started_at: datetime | None = None
+    completed_at: datetime | None = None
+    failed_at: datetime | None = None
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utcnow)
+    updated_at: datetime = field(default_factory=utcnow)
+
+    def advance(self, stage: IngestionStage, progress_percent: int) -> None:
+        order = list(IngestionStage)
+        if self.status in {IngestionStatus.COMPLETED, IngestionStatus.CANCELLED}:
+            raise InvalidStateTransitionError("Terminal ingestion job cannot advance")
+        if order.index(stage) < order.index(self.stage):
+            raise InvalidStateTransitionError("Ingestion stages cannot move backwards")
+        self.status = IngestionStatus.RUNNING
+        self.stage, self.progress_percent, self.started_at = (
+            stage,
+            progress_percent,
+            self.started_at or utcnow(),
+        )
+        self.updated_at = utcnow()
+
+    def complete(self) -> None:
+        self.advance(IngestionStage.COMPLETED, 100)
+        self.status, self.completed_at = IngestionStatus.COMPLETED, utcnow()
+
+    def fail(self, code: str, message: str) -> None:
+        if self.status is IngestionStatus.COMPLETED:
+            raise InvalidStateTransitionError("Completed ingestion job cannot fail")
+        self.status, self.error_code, self.error_message, self.failed_at = (
+            IngestionStatus.FAILED,
+            code,
+            message,
+            utcnow(),
+        )
+        self.updated_at = utcnow()
+
+
+@dataclass(frozen=True)
+class StructuredContentBlock:
+    kind: str
+    text: str = ""
+    page_start: int | None = None
+    page_end: int | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class StructuredSection:
+    heading: str | None
+    heading_level: int | None
+    section_path: tuple[str, ...]
+    blocks: tuple[StructuredContentBlock, ...]
+    page_start: int | None = None
+    page_end: int | None = None
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class StructuredDocument:
+    title: str | None
+    language: str | None
+    source_mime_type: str
+    parser_name: str
+    parser_version: str
+    sections: tuple[StructuredSection, ...]
+    page_count: int | None = None
+    parser_warnings: tuple[str, ...] = ()
+    metadata: Mapping[str, Any] = field(default_factory=dict)
+
+
+@dataclass(frozen=True)
+class SourceChunk:
+    source_snapshot_id: UUID
+    chunk_index: int
+    text: str
+    page_start: int | None
+    page_end: int | None
+    section_path: tuple[str, ...]
+    heading: str | None
+    token_count: int
+    chunk_hash: str
+    embedding: tuple[float, ...] | None = None
+    embedding_model: str | None = None
+    embedding_dimension: int | None = None
+    metadata_json: Mapping[str, Any] = field(default_factory=dict)
+    id: UUID = field(default_factory=uuid4)
+    created_at: datetime = field(default_factory=utcnow)
+
+
 @dataclass
 class Workspace:
     name: str
