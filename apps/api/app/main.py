@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from packages.application.ingestion import IngestionError, IngestionService, TextDocumentParser
+from packages.application.research import ResearchService
 from packages.application.services import ConflictError, DomainService, NotFoundError
 from packages.domain.models import (
     Course,
@@ -23,6 +24,7 @@ from packages.domain.models import (
     Workspace,
 )
 from packages.domain.ports import ReadinessProbe
+from packages.domain.research import ResearchError
 from packages.infrastructure.ingestion import (
     DeterministicEmbeddingProvider,
     InMemoryChunkRepository,
@@ -32,6 +34,11 @@ from packages.infrastructure.ingestion import (
 from packages.infrastructure.logging import configure_logging
 from packages.infrastructure.memory import MemoryUnitOfWork
 from packages.infrastructure.readiness import create_readiness_probes
+from packages.infrastructure.research import (
+    InMemoryResearchCheckpointStore,
+    InMemoryResearchJobRepository,
+    InMemoryResearchWorkflow,
+)
 from packages.infrastructure.settings import Settings, get_settings
 
 logger = structlog.get_logger(__name__)
@@ -403,3 +410,136 @@ def _phase2_routes(app: FastAPI) -> None:
 
 
 _phase2_routes(app)
+
+# Phase 5 routes queue work only; worker adapters invoke ResearchWorkflow separately.
+_research_jobs = InMemoryResearchJobRepository()
+_research_checkpoints = InMemoryResearchCheckpointStore()
+_research_workflow = InMemoryResearchWorkflow(_research_jobs, _research_checkpoints)
+_research_service = ResearchService(_research_jobs, _research_workflow)
+
+
+class ResearchStartIn(BaseModel):
+    goal: str = Field(min_length=1)
+    created_by: UUID
+    learner_context: str | None = None
+    locale: str = "en"
+    time_range: str | None = None
+    research_depth: int = Field(default=1, ge=1, le=10)
+    research_policy: dict[str, Any] = Field(default_factory=dict)
+
+
+def _research_error(request: Request, exc: ResearchError) -> JSONResponse:
+    code = exc.code
+    http = (
+        404
+        if code == "RESEARCH_JOB_NOT_FOUND"
+        else 409
+        if code in {"IDEMPOTENCY_CONFLICT", "INVALID_RESEARCH_TRANSITION", "RESEARCH_CANCELLED"}
+        else 422
+    )
+    return JSONResponse(
+        status_code=http,
+        content={
+            "error": {
+                "code": code,
+                "message": exc.message,
+                "details": {},
+                "trace_id": request.headers.get("X-Trace-ID", ""),
+            }
+        },
+    )
+
+
+@app.post("/api/v1/projects/{project_id}/research-jobs", status_code=202)
+async def start_research(project_id: UUID, body: ResearchStartIn, request: Request) -> Any:
+    key = request.headers.get("Idempotency-Key")
+    if not key:
+        return _research_error(
+            request, ResearchError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required")
+        )
+    try:
+        return await _research_service.start(
+            project_id,
+            body.created_by,
+            body.goal,
+            body.locale,
+            key,
+            request.headers.get("X-Trace-ID", ""),
+            body.research_depth,
+            body.learner_context,
+            body.time_range,
+            body.research_policy,
+        )
+    except ResearchError as exc:
+        return _research_error(request, exc)
+
+
+@app.get("/api/v1/research-jobs/{job_id}")
+async def get_research(job_id: UUID, request: Request) -> Any:
+    try:
+        return await _research_service.get(job_id)
+    except ResearchError as exc:
+        return _research_error(request, exc)
+
+
+@app.get("/api/v1/research-jobs/{job_id}/events")
+async def research_events(job_id: UUID, request: Request) -> Any:
+    try:
+        await _research_service.get(job_id)
+        return []
+    except ResearchError as exc:
+        return _research_error(request, exc)
+
+
+@app.get("/api/v1/research-jobs/{job_id}/{artifact}")
+async def research_artifact(job_id: UUID, artifact: str, request: Request) -> Any:
+    try:
+        state = await _research_workflow.get_state(job_id)
+        allowed = {
+            "brief": state.research_brief,
+            "queries": state.planned_queries,
+            "sources": state.selected_source_ids,
+            "observations": state.extraction_artifact_ids,
+            "coverage": state.coverage,
+            "gaps": state.gaps,
+            "result": state.final_artifact_id,
+        }
+        if artifact not in allowed:
+            return JSONResponse(
+                status_code=404,
+                content={
+                    "error": {
+                        "code": "RESEARCH_JOB_NOT_FOUND",
+                        "message": "Artifact not found",
+                        "details": {},
+                        "trace_id": request.headers.get("X-Trace-ID", ""),
+                    }
+                },
+            )
+        return allowed[artifact]
+    except ResearchError as exc:
+        return _research_error(request, exc)
+
+
+@app.post("/api/v1/research-jobs/{job_id}/{action}")
+async def research_control(job_id: UUID, action: str, request: Request) -> Any:
+    try:
+        if action == "cancel":
+            return await _research_service.cancel(job_id)
+        if action == "resume":
+            return await _research_service.resume(job_id)
+        if action == "retry":
+            return await _research_service.retry(job_id)
+        return JSONResponse(
+            status_code=404,
+            content={
+                "error": {
+                    "code": "RESEARCH_JOB_NOT_FOUND",
+                    "message": "Action not found",
+                    "details": {},
+                    "trace_id": request.headers.get("X-Trace-ID", ""),
+                }
+            },
+        )
+    except ResearchError as exc:
+        return _research_error(request, exc)

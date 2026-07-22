@@ -70,3 +70,8 @@ addresses). Fetching is GET-only, cookie/auth-free, redirect-limited, MIME/byte-
 never executes JavaScript. Robots failures fail closed; a robots denial is recorded as an
 access decision rather than treated as a network failure. Browser automation is disabled by
 default and must not bypass login, CAPTCHA, paywalls, or robots.
+
+## Phase 5 extraction boundary
+Research prompts delimit source content and require structured output. Injection-like phrases are
+recorded as suspicious source metadata, never executed as instructions. Only existing policy-bound
+search/fetch/ingestion services may be used by workflow nodes.

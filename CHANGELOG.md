@@ -31,3 +31,7 @@ All notable changes to this project are documented in this file.
 ## Phase 4 — Search and crawling
 - Added provider-neutral web search/fetch contracts, deterministic SearXNG mapping and safe mocked adapters.
 - Added URL canonicalization, DNS-based SSRF checks, redirect validation, robots fail-closed policy, HTML normalization, RRF fusion, and disabled browser boundary.
+
+## Phase 5
+- Added provider-neutral, resumable research-job contracts, typed checkpoint state, budget and lifecycle controls, and asynchronous job-control API surface.
+- Declared the optional-at-runtime LangGraph workflow adapter and documented deferred live orchestration verification.
