@@ -26,6 +26,8 @@ from packages.domain.ports import (
     EmbeddingProvider,
     IngestionJobRepository,
     ProgressEventPublisher,
+    SourceRepository,
+    SourceSnapshotRepository,
 )
 
 
@@ -181,6 +183,8 @@ class TextDocumentParser:
                 heading = lines[0][level:].strip()
                 path = path[: level - 1] + [heading]
                 blocks = []
+                if body := "\n".join(lines[1:]).strip():
+                    blocks.append(StructuredContentBlock("paragraph", body))
             elif paragraph.strip():
                 blocks.append(StructuredContentBlock("paragraph", paragraph.strip()))
         if blocks or not sections:
@@ -200,13 +204,25 @@ class IngestionService:
         parser: DocumentParser,
         embeddings: EmbeddingProvider,
         events: ProgressEventPublisher,
+        sources: SourceRepository,
+        snapshots: SourceSnapshotRepository,
     ):
-        self.jobs, self.chunks, self.parser, self.embeddings, self.events = (
+        (
+            self.jobs,
+            self.chunks,
+            self.parser,
+            self.embeddings,
+            self.events,
+            self.sources,
+            self.snapshots,
+        ) = (
             jobs,
             chunks,
             parser,
             embeddings,
             events,
+            sources,
+            snapshots,
         )
 
     async def ingest_text(
@@ -237,6 +253,8 @@ class IngestionService:
             hashlib.sha256(normalized.encode()).hexdigest(),
             {"original_text": text, "normalized": True},
         )
+        await self.sources.add(source)
+        await self.snapshots.add(snapshot)
         job = await self.jobs.create(
             IngestionJob(
                 project_id, source.id, snapshot.id, InputType.TEXT, idempotency_key, trace_id
@@ -251,11 +269,19 @@ class IngestionService:
     ) -> tuple[Source, IngestionJob]:
         canonical = canonicalize_url(url)
         request_hash = hashlib.sha256(f"URL:{project_id}:{canonical}".encode()).hexdigest()
+        existing = await self.jobs.get_by_idempotency_key(idempotency_key)
+        if existing:
+            if getattr(existing, "request_hash", request_hash) != request_hash:
+                raise IngestionError(
+                    "IDEMPOTENCY_CONFLICT", "Idempotency key was reused with another payload"
+                )
+            raise IngestionError("SOURCE_DUPLICATE", str(existing.id))
         job = await self.jobs.create(
             IngestionJob(project_id, UUID(int=0), None, InputType.URL, idempotency_key, trace_id),
             request_hash,
         )
         source = Source(project_id, "URL", title or canonical, canonical_url=canonical)
+        await self.sources.add(source)
         job.source_id = source.id
         job.complete()
         await self.jobs.update(job)
