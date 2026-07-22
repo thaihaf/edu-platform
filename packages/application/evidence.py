@@ -95,20 +95,25 @@ class EvidenceService:
     async def build(
         self, project_id: UUID, observations: Iterable[object], key: str
     ) -> list[Claim]:
-        payload = repr(
-            [
-                (getattr(x, "id", None), getattr(x, "text", getattr(x, "statement", "")))
-                for x in observations
-            ]
-        )
+        observations = list(observations)
+
+        def observation_text(observation: object) -> str:
+            """Read Phase 5 observations before compatibility fields."""
+            return str(
+                getattr(
+                    observation,
+                    "normalized_text",
+                    getattr(observation, "text", getattr(observation, "statement", "")),
+                )
+            )
+
+        payload = repr([(getattr(x, "id", None), observation_text(x)) for x in observations])
         if key in self.keys and self.keys[key] != payload:
             raise EvidenceError("IDEMPOTENCY_CONFLICT", "Idempotency key has a different payload")
         self.keys[key] = payload
         created = []
         for observation in observations:
-            statement = normalize(
-                str(getattr(observation, "text", getattr(observation, "statement", "")))
-            )
+            statement = normalize(observation_text(observation))
             if not statement:
                 continue
             claim = Claim(
@@ -169,6 +174,10 @@ class EvidenceService:
                 for x in await self.repo.links_for_claim(claim.id)
             )
         )
+        # Human approval is allowed to complete the candidate -> probable -> verified
+        # lifecycle in one reviewed operation once the verification policy is satisfied.
+        if target is ClaimStatus.VERIFIED and claim.status is ClaimStatus.CANDIDATE and verified:
+            claim.transition(ClaimStatus.PROBABLE)
         if target is not claim.status:
             claim.transition(target, verified=verified)
         claim.review_status = review
