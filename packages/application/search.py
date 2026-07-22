@@ -64,6 +64,16 @@ def canonicalize_web_url(value: str, remove_tracking: bool = True) -> str:
 
 
 async def validate_public_url(url: str, resolver: DNSResolver) -> str:
+    canonical, _ = await resolve_public_url(url, resolver)
+    return canonical
+
+
+async def resolve_public_url(url: str, resolver: DNSResolver) -> tuple[str, tuple[str, ...]]:
+    """Return a canonical URL and the public addresses vetted for this request.
+
+    Callers that open a socket must use the returned addresses rather than resolving
+    the hostname again; otherwise DNS rebinding can defeat this validation.
+    """
     canonical = canonicalize_web_url(url)
     host = urlsplit(canonical).hostname or ""
     if host == "localhost" or re.fullmatch(r"(?:0x[0-9a-f]+|\d+)", host, re.I):
@@ -86,7 +96,7 @@ async def validate_public_url(url: str, resolver: DNSResolver) -> str:
             raise SearchError("URL_RESOLUTION_FAILED", "Resolver returned invalid address") from exc
         if not address.is_global or str(address) == "169.254.169.254":
             raise SearchError("URL_HOST_FORBIDDEN", "URL host is not publicly routable")
-    return canonical
+    return canonical, addresses
 
 
 def normalize_result(

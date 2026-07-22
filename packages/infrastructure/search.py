@@ -5,17 +5,23 @@ import hashlib
 import socket
 from datetime import datetime
 from html.parser import HTMLParser
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit, urlunsplit
 
 import httpx
 
-from packages.application.search import SearchError, canonicalize_web_url, validate_public_url
+from packages.application.search import (
+    SearchError,
+    canonicalize_web_url,
+    resolve_public_url,
+    validate_public_url,
+)
 from packages.domain.search import (
     NormalizedWebDocument,
     ProviderSearchResult,
     SearchOptions,
     SearchResultPage,
 )
+from packages.domain.search_ports import RobotsPolicyProvider
 
 
 class SystemDNSResolver:
@@ -194,34 +200,94 @@ class DisabledBrowserProvider:
         raise SearchError("BROWSER_PROVIDER_DISABLED", "Browser provider is disabled by policy")
 
 
+def _pinned_url(url: str, address: str) -> tuple[str, str]:
+    """Make an HTTP URL that dials ``address`` while retaining the original host."""
+    parsed = urlsplit(url)
+    host = parsed.hostname or ""
+    # Brackets are required when an IPv6 literal is used in a URL authority.
+    dial_host = f"[{address}]" if ":" in address else address
+    port = f":{parsed.port}" if parsed.port is not None else ""
+    return urlunsplit((parsed.scheme, f"{dial_host}{port}", parsed.path, parsed.query, "")), host
+
+
+def _pinned_request(
+    client: httpx.AsyncClient, url: str, addresses: tuple[str, ...], headers: dict[str, str]
+) -> httpx.Request:
+    # Use a validated address in the URL, not the hostname that httpx would resolve.
+    # httpcore honors sni_hostname for TLS while Host keeps virtual-host routing intact.
+    dial_url, hostname = _pinned_url(url, addresses[0])
+    parsed = urlsplit(url)
+    host_header = parsed.netloc
+    request = client.build_request("GET", dial_url, headers={**headers, "Host": host_header})
+    request.extensions["sni_hostname"] = hostname
+    return request
+
+
+async def _pinned_stream_get(
+    client: httpx.AsyncClient | None,
+    url: str,
+    addresses: tuple[str, ...],
+    *,
+    max_bytes: int,
+    headers: dict[str, str],
+) -> tuple[httpx.Response, bytes]:
+    """Read a pinned response incrementally and enforce the allocation limit."""
+
+    async def read(active_client: httpx.AsyncClient) -> tuple[httpx.Response, bytes]:
+        request = _pinned_request(active_client, url, addresses, headers)
+        async with active_client.stream(
+            "GET", request.url, headers=request.headers, extensions=request.extensions
+        ) as response:
+            chunks: list[bytes] = []
+            size = 0
+            async for chunk in response.aiter_bytes():
+                size += len(chunk)
+                if size > max_bytes:
+                    raise SearchError("RESPONSE_TOO_LARGE", "Response exceeds byte limit")
+                chunks.append(chunk)
+            return response, b"".join(chunks)
+
+    if client:
+        return await read(client)
+    async with httpx.AsyncClient(follow_redirects=False, cookies=None) as owned_client:
+        return await read(owned_client)
+
+
 class HttpRobotsPolicy:
     """Fail closed on a robots retrieval failure; its client must be SSRF-safe."""
 
-    def __init__(self, resolver: SystemDNSResolver, client: httpx.AsyncClient | None = None):
-        self.resolver, self.client = resolver, client
+    def __init__(
+        self,
+        resolver: SystemDNSResolver,
+        client: httpx.AsyncClient | None = None,
+        max_bytes: int = 64_000,
+    ):
+        self.resolver, self.client, self.max_bytes = resolver, client, max_bytes
 
     async def may_fetch(self, url: str, user_agent: str) -> bool:
-        from urllib.parse import urlsplit
         from urllib.robotparser import RobotFileParser
 
-        safe = await validate_public_url(url, self.resolver)
+        safe, addresses = await resolve_public_url(url, self.resolver)
         base = urlsplit(safe)
         robots = f"{base.scheme}://{base.netloc}/robots.txt"
-        await validate_public_url(robots, self.resolver)
         try:
-            if self.client:
-                response = await self.client.get(robots, follow_redirects=False)
-            else:
-                async with httpx.AsyncClient() as c:
-                    response = await c.get(robots, follow_redirects=False)
+            response, content = await _pinned_stream_get(
+                self.client,
+                robots,
+                addresses,
+                max_bytes=self.max_bytes,
+                headers={"User-Agent": user_agent},
+            )
             if response.status_code == 404:
                 return True
             if response.status_code >= 400:
                 return False
             parser = RobotFileParser()
-            parser.parse(response.text.splitlines())
+            parser.parse(
+                content.decode(response.encoding or "utf-8", errors="replace").splitlines()
+            )
             return parser.can_fetch(user_agent, safe)
-        except httpx.HTTPError:
+        except (httpx.HTTPError, SearchError):
             return False
 
 
@@ -233,6 +299,8 @@ class HttpCrawlProvider:
         client: httpx.AsyncClient | None = None,
         max_bytes: int = 2_000_000,
         redirect_limit: int = 5,
+        robots_policy: RobotsPolicyProvider | None = None,
+        user_agent: str = "ai-course-research-bot/0.1",
     ):
         self.resolver, self.normalizer, self.client, self.max_bytes, self.redirect_limit = (
             resolver,
@@ -241,24 +309,24 @@ class HttpCrawlProvider:
             max_bytes,
             redirect_limit,
         )
+        self.robots_policy = robots_policy or HttpRobotsPolicy(resolver, client)
+        self.user_agent = user_agent
 
     async def fetch_url(self, url: str) -> bytes:
         current = url
         redirects = 0
         while True:
-            await validate_public_url(current, self.resolver)
+            safe_url, addresses = await resolve_public_url(current, self.resolver)
+            if not await self.robots_policy.may_fetch(safe_url, self.user_agent):
+                raise SearchError("ROBOTS_DISALLOWED", "Robots policy disallows this URL")
             try:
-                if self.client:
-                    response = await self.client.get(
-                        current,
-                        follow_redirects=False,
-                        headers={"User-Agent": "ai-course-research-bot/0.1"},
-                    )
-                else:
-                    async with httpx.AsyncClient(follow_redirects=False, cookies=None) as c:
-                        response = await c.get(
-                            current, headers={"User-Agent": "ai-course-research-bot/0.1"}
-                        )
+                response, data = await _pinned_stream_get(
+                    self.client,
+                    safe_url,
+                    addresses,
+                    max_bytes=self.max_bytes,
+                    headers={"User-Agent": self.user_agent},
+                )
             except httpx.TimeoutException as exc:
                 raise SearchError("FETCH_TIMEOUT", "Fetch timed out") from exc
             except httpx.HTTPError as exc:
@@ -270,16 +338,13 @@ class HttpCrawlProvider:
                 location = response.headers.get("location")
                 if not location:
                     raise SearchError("FETCH_FAILED", "Malformed redirect")
-                current = urljoin(current, location)
+                current = urljoin(safe_url, location)
                 continue
             if response.headers.get("content-type", "").split(";", 1)[0] not in {
                 "text/html",
                 "application/xhtml+xml",
             }:
                 raise SearchError("UNSUPPORTED_CONTENT_TYPE", "Response type is unsupported")
-            data = response.content
-            if len(data) > self.max_bytes:
-                raise SearchError("RESPONSE_TOO_LARGE", "Response exceeds byte limit")
             return data
 
     async def crawl_page(self, url: str) -> NormalizedWebDocument:
@@ -293,7 +358,9 @@ class Crawl4AIProvider(HttpCrawlProvider):
     """Optional Crawl4AI boundary; import is intentionally delayed to runtime."""
 
     async def crawl_page(self, url: str) -> NormalizedWebDocument:
-        await validate_public_url(url, self.resolver)
+        safe_url = await validate_public_url(url, self.resolver)
+        if not await self.robots_policy.may_fetch(safe_url, self.user_agent):
+            raise SearchError("ROBOTS_DISALLOWED", "Robots policy disallows this URL")
         try:
             from crawl4ai import AsyncWebCrawler  # type: ignore[import-not-found]
         except ImportError as exc:
