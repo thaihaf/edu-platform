@@ -45,6 +45,9 @@ from packages.infrastructure.research import (
     InMemoryResearchJobRepository,
     InMemoryResearchWorkflow,
 )
+from packages.application.questions import QuestionService, fingerprint as question_fingerprint
+from packages.domain.question import QuestionError, QuestionGenerationJob, QuestionType
+from packages.infrastructure.question import InMemoryQuestionRepository
 from packages.infrastructure.settings import Settings, get_settings
 
 logger = structlog.get_logger(__name__)
@@ -759,3 +762,48 @@ async def get_course_generation(job_id: UUID, request: Request) -> Any:
 @app.get("/api/v1/course-generation-jobs/{job_id}/events")
 async def get_course_generation_events(job_id: UUID, request: Request) -> Any:
     return _course_repository.events.get(job_id, [])
+
+
+# Phase 8 routes only accept/poll work; generation is deliberately outside request execution.
+_question_repository = InMemoryQuestionRepository()
+
+
+class QuestionGenerationIn(BaseModel):
+    created_by: UUID
+    requested_question_types: list[QuestionType]
+    requested_count: int = Field(ge=1)
+    course_id: UUID | None = None
+    course_version_id: UUID | None = None
+    module_id: UUID | None = None
+    lesson_id: UUID | None = None
+    difficulty_distribution: dict[str, int] = Field(default_factory=dict)
+    bloom_distribution: dict[str, int] = Field(default_factory=dict)
+    origin_policy: dict[str, Any] = Field(default_factory=dict)
+
+
+def _question_error(request: Request, exc: QuestionError) -> JSONResponse:
+    return JSONResponse(status_code=404 if exc.code.endswith("NOT_FOUND") else 409 if exc.code in {"IDEMPOTENCY_CONFLICT", "QUESTION_BANK_VERSION_IMMUTABLE"} else 422, content={"error": {"code": exc.code, "message": exc.message, "details": {}, "trace_id": request.headers.get("X-Trace-ID", "")}})
+
+
+@app.post("/api/v1/projects/{project_id}/question-generation-jobs", status_code=202)
+async def start_question_generation(project_id: UUID, body: QuestionGenerationIn, request: Request) -> Any:
+    key = request.headers.get("Idempotency-Key")
+    if not key:
+        return _question_error(request, QuestionError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required"))
+    data = body.model_dump()
+    job = QuestionGenerationJob(project_id, key, tuple(data["requested_question_types"]), data["requested_count"], data["created_by"], course_id=data["course_id"], course_version_id=data["course_version_id"], module_id=data["module_id"], lesson_id=data["lesson_id"], difficulty_distribution=data["difficulty_distribution"], bloom_distribution=data["bloom_distribution"], origin_policy=data["origin_policy"], request_fingerprint=question_fingerprint(data))
+    try:
+        return await QuestionService(_question_repository).start(job)
+    except QuestionError as exc:
+        return _question_error(request, exc)
+
+
+@app.get("/api/v1/question-generation-jobs/{job_id}")
+async def get_question_generation(job_id: UUID, request: Request) -> Any:
+    job = await _question_repository.get_job(job_id)
+    return job if job else _question_error(request, QuestionError("QUESTION_GENERATION_JOB_NOT_FOUND", "Question generation job not found"))
+
+
+@app.get("/api/v1/question-generation-jobs/{job_id}/events")
+async def get_question_generation_events(job_id: UUID) -> list[dict[str, Any]]:
+    return _question_repository.events.get(job_id, [])

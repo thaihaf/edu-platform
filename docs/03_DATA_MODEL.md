@@ -139,3 +139,9 @@ prerequisites are relational graph records with cycle validation.
 lessons, objectives, structured content blocks, immutable citations, and version diffs preserve
 claim/evidence/source provenance. Positions are unique within their parent scope; published versions
 are immutable and rollback clones a historical version into a reviewed draft.
+
+## Phase 8 assessment model
+`QuestionGenerationJob` records idempotent, staged assessment work. `QuestionBank` and
+immutable published `QuestionBankVersion` contain questions, options, immutable citations,
+append-only validations, revisions and review decisions. Questions retain origin, objective,
+skill, claim and evidence linkage; duplicate clusters preserve rather than delete provenance.

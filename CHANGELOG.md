@@ -1,5 +1,9 @@
 # Changelog
 
+## Phase 8
+- Add framework-neutral validated assessment-question contracts, deterministic quality gates,
+  question-bank drafts/publication, review history, and an asynchronous generation-job API boundary.
+
 All notable changes to this project are documented in this file.
 
 ## [0.3.0] - 2026-07-22
