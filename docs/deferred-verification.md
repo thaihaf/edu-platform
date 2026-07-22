@@ -33,3 +33,8 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | Celery evidence-build execution and API-to-worker flow | Docker unavailable | e2e | run Compose API, worker and Redis evidence-build suite |
 | Large-corpus source clustering and optional Neo4j adapter | infrastructure/runtime unavailable | integration | run corpus and graph-adapter benchmarks |
 | Real model-assisted normalization | no model credentials/provider configured | integration | run structured model contract suite |
+| Live PostgreSQL Phase 7 course persistence and immutable constraints | no PostgreSQL service | integration | run Phase 7 repository/migration suite against PostgreSQL |
+| Celery course-generation execution and API-to-worker generation | Docker unavailable | e2e | run Compose API, worker and Redis suite |
+| Real structured course/lesson model calls, token and cost accounting | no model credentials/provider configured | integration | configure provider and run model contracts |
+| Large-course generation | worker/database runtime unavailable | integration | run benchmark fixture with PostgreSQL and worker |
+| Rendering-sanitization integration | web rendering runtime unavailable | integration | run API-to-renderer sanitization suite |

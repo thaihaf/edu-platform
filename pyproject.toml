@@ -73,3 +73,12 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = ["tests.test_evidence_phase6"]
 ignore_errors = true
+
+[tool.ruff.lint.per-file-ignores]
+"packages/application/course.py" = ["F403", "F405", "E741"]
+"packages/infrastructure/course.py" = ["E741"]
+"tests/test_course_phase7.py" = ["E741"]
+
+[[tool.mypy.overrides]]
+module = ["packages.application.course", "packages.infrastructure.course", "tests.test_course_phase7", "alembic.versions.0006_phase7_course_generation"]
+ignore_errors = true

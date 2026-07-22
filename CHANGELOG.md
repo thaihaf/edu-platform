@@ -39,3 +39,6 @@ All notable changes to this project are documented in this file.
 
 ## Phase 6
 - Added deterministic evidence and knowledge graph foundations, claim fingerprints, confidence policy, immutable evidence links, review decisions and relational migration groundwork.
+
+## Phase 7
+- Added deterministic cited course draft generation, validation, versioning, and rollback foundations.

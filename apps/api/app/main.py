@@ -11,10 +11,12 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
+from packages.application.course import CourseService, fingerprint
 from packages.application.evidence import EvidenceService
 from packages.application.ingestion import IngestionError, IngestionService, TextDocumentParser
 from packages.application.research import ResearchService
 from packages.application.services import ConflictError, DomainService, NotFoundError
+from packages.domain.course import CourseError, CourseGenerationJob
 from packages.domain.evidence import EvidenceError, ReviewDecisionType
 from packages.domain.models import (
     Course,
@@ -27,6 +29,7 @@ from packages.domain.models import (
 )
 from packages.domain.ports import ReadinessProbe
 from packages.domain.research import ResearchError
+from packages.infrastructure.course import InMemoryCourseRepository
 from packages.infrastructure.evidence import InMemoryEvidenceRepository
 from packages.infrastructure.ingestion import (
     DeterministicEmbeddingProvider,
@@ -654,3 +657,88 @@ def _evidence_error(request: Request, exc: EvidenceError) -> JSONResponse:
             }
         },
     )
+
+
+# Phase 7 routes use deterministic in-memory adapters in this local API process.
+_course_repository = InMemoryCourseRepository()
+
+
+class CourseGenerationIn(BaseModel):
+    target_outcome: str = Field(min_length=1)
+    target_audience: str = Field(min_length=1)
+    created_by: UUID
+    locale: str = "en"
+    learner_profile: str | None = None
+    time_budget: int | None = Field(default=None, gt=0)
+    module_limit: int | None = Field(default=None, gt=0)
+    lesson_limit: int | None = Field(default=None, gt=0)
+    course_id: UUID | None = None
+
+
+def _course_service() -> CourseService:
+    return CourseService(_course_repository, list(_evidence_repository.claims.values()), [], {})
+
+
+def _course_error(request: Request, exc: CourseError) -> JSONResponse:
+    return JSONResponse(
+        status_code=404
+        if exc.code.endswith("NOT_FOUND")
+        else 409
+        if exc.code in {"IDEMPOTENCY_CONFLICT", "COURSE_VERSION_IMMUTABLE"}
+        else 422,
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "details": {},
+                "trace_id": request.headers.get("X-Trace-ID", ""),
+            }
+        },
+    )
+
+
+@app.post("/api/v1/projects/{project_id}/course-generation-jobs", status_code=202)
+async def start_course_generation(
+    project_id: UUID, body: CourseGenerationIn, request: Request
+) -> Any:
+    key = request.headers.get("Idempotency-Key")
+    if not key:
+        return _course_error(
+            request, CourseError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required")
+        )
+    data = body.model_dump()
+    job = CourseGenerationJob(
+        project_id,
+        key,
+        data["target_outcome"],
+        data["target_audience"],
+        data["created_by"],
+        locale=data["locale"],
+        course_id=data["course_id"],
+        learner_profile=data["learner_profile"],
+        time_budget=data["time_budget"],
+        module_limit=data["module_limit"],
+        lesson_limit=data["lesson_limit"],
+        request_fingerprint=fingerprint(data),
+    )
+    try:
+        return await _course_service().start(job)
+    except CourseError as exc:
+        return _course_error(request, exc)
+
+
+@app.get("/api/v1/course-generation-jobs/{job_id}")
+async def get_course_generation(job_id: UUID, request: Request) -> Any:
+    job = await _course_repository.get_job(job_id)
+    return (
+        job
+        if job
+        else _course_error(
+            request, CourseError("COURSE_GENERATION_JOB_NOT_FOUND", "Generation job not found")
+        )
+    )
+
+
+@app.get("/api/v1/course-generation-jobs/{job_id}/events")
+async def get_course_generation_events(job_id: UUID, request: Request) -> Any:
+    return _course_repository.events.get(job_id, [])
