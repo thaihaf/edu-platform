@@ -68,3 +68,12 @@ Base path: `/api/v1`
   }
 }
 ```
+
+## Phase 2 implemented domain endpoints
+
+Phase 2 implements the domain-data subset under `/api/v1`: workspace creation and
+lookup; project create/read/update; source create/list/read; immutable snapshot
+create/list; course create/read; and course-version create/list/read/edit/publish.
+Snapshots have no update route. Editing a non-draft course version returns the
+standard `409 CONFLICT` error contract. Create operations return `201`; reads and
+updates return `200`.

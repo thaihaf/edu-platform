@@ -1,1 +1,1 @@
-"""Vendor-independent domain types and ports."""
+"""Framework-independent domain model and ports."""

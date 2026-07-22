@@ -1,10 +1,71 @@
 from __future__ import annotations
 
 from typing import Protocol
+from uuid import UUID
+
+from packages.domain.models import (
+    AuditEvent,
+    Course,
+    CourseVersion,
+    ResearchProject,
+    Source,
+    SourceSnapshot,
+    Workspace,
+)
 
 
 class ReadinessProbe(Protocol):
-    """Port used by the API to verify a required runtime dependency."""
+    async def ping(self) -> None: ...
 
-    async def ping(self) -> None:
-        """Raise an exception when the dependency is unavailable."""
+
+class WorkspaceRepository(Protocol):
+    async def add(self, entity: Workspace) -> None: ...
+    async def get(self, entity_id: UUID) -> Workspace | None: ...
+
+
+class ResearchProjectRepository(Protocol):
+    async def add(self, entity: ResearchProject) -> None: ...
+    async def get(self, entity_id: UUID) -> ResearchProject | None: ...
+    async def update(self, entity: ResearchProject) -> None: ...
+
+
+class SourceRepository(Protocol):
+    async def add(self, entity: Source) -> None: ...
+    async def get(self, entity_id: UUID) -> Source | None: ...
+    async def list_for_project(self, project_id: UUID) -> list[Source]: ...
+
+
+class SourceSnapshotRepository(Protocol):
+    async def add(self, entity: SourceSnapshot) -> None: ...
+    async def list_for_source(self, source_id: UUID) -> list[SourceSnapshot]: ...
+
+
+class CourseRepository(Protocol):
+    async def add(self, entity: Course) -> None: ...
+    async def get(self, entity_id: UUID) -> Course | None: ...
+
+
+class CourseVersionRepository(Protocol):
+    async def add(self, entity: CourseVersion) -> None: ...
+    async def get(self, entity_id: UUID) -> CourseVersion | None: ...
+    async def update_draft(self, entity: CourseVersion) -> None: ...
+    async def list_for_course(self, course_id: UUID) -> list[CourseVersion]: ...
+
+
+class AuditEventRepository(Protocol):
+    async def append(self, entity: AuditEvent) -> None: ...
+
+
+class UnitOfWork(Protocol):
+    workspaces: WorkspaceRepository
+    projects: ResearchProjectRepository
+    sources: SourceRepository
+    snapshots: SourceSnapshotRepository
+    courses: CourseRepository
+    course_versions: CourseVersionRepository
+    audit_events: AuditEventRepository
+
+    async def __aenter__(self) -> UnitOfWork: ...
+    async def __aexit__(self, exc_type: object, exc: object, tb: object) -> None: ...
+    async def commit(self) -> None: ...
+    async def rollback(self) -> None: ...

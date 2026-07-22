@@ -106,3 +106,10 @@ Mục tiêu không phải là một LMS truyền thống. Lõi sản phẩm là 
 10. Admin web
 11. Learner web
 12. Production hardening
+
+### Phase 2 local checks
+
+Without Docker, run `make check`, `pytest -m "not integration and not e2e"`,
+`alembic upgrade head --sql`, and static YAML parsing for `docker-compose.yml`.
+The Docker and PostgreSQL checks deferred by the environment are listed in
+`docs/deferred-verification.md`.
