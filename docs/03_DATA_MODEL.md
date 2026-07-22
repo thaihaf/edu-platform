@@ -127,3 +127,9 @@ Immutable fetched content.
 
 A published CourseVersion is immutable.
 Updates create a new DRAFT CourseVersion.
+
+## Phase 6 evidence model
+Claims retain normalized scope, provenance, validity, status/version and confidence components.
+Evidence links are immutable append-only provenance rows. Confidence assessments and review decisions
+are append-only; source clusters prevent copied sources from inflating corroboration. Skills and
+prerequisites are relational graph records with cycle validation.

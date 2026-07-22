@@ -29,3 +29,7 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | Live SearXNG/Crawl4AI orchestration | Docker/browser runtime unavailable | integration | run approved provider orchestration fixtures |
 | Real structured-output model, token and cost accounting | no model credentials/provider configured | integration | configure provider then run model contract suite |
 | API-to-worker research execution | API deliberately only queues work; no worker/Redis runtime available | e2e | run worker with Redis and invoke `POST /api/v1/projects/{id}/research-jobs` |
+| Live PostgreSQL Phase 6 evidence persistence and database constraints | no PostgreSQL service | integration | run Phase 6 repository/migration suite against PostgreSQL |
+| Celery evidence-build execution and API-to-worker flow | Docker unavailable | e2e | run Compose API, worker and Redis evidence-build suite |
+| Large-corpus source clustering and optional Neo4j adapter | infrastructure/runtime unavailable | integration | run corpus and graph-adapter benchmarks |
+| Real model-assisted normalization | no model credentials/provider configured | integration | run structured model contract suite |

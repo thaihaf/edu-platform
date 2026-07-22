@@ -149,3 +149,49 @@ class SourceChunkRow(Base):
     embedding_dimension: Mapped[int | None] = mapped_column(Integer)
     metadata_json: Mapped[dict] = mapped_column(JSON)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+# Phase 6 evidence records are relational first; mutable review state is represented by new rows.
+class ClaimRow(Base):
+    __tablename__ = "claims"
+    __table_args__ = (
+        UniqueConstraint("project_id", "fingerprint", name="uq_claim_project_fingerprint"),
+    )
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("research_projects.id"), index=True)
+    fingerprint: Mapped[str] = mapped_column(String(64))
+    normalized_statement: Mapped[str] = mapped_column(Text)
+    claim_type: Mapped[str] = mapped_column(String(64))
+    subject_entities: Mapped[dict] = mapped_column(JSON)
+    temporal_scope: Mapped[dict] = mapped_column(JSON)
+    status: Mapped[str] = mapped_column(String(32), index=True)
+    confidence: Mapped[float] = mapped_column()
+    version: Mapped[int] = mapped_column(Integer)
+    supersedes_claim_id: Mapped[UUID | None] = mapped_column(ForeignKey("claims.id"))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class EvidenceLinkRow(Base):
+    __tablename__ = "evidence_links"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("research_projects.id"), index=True)
+    claim_id: Mapped[UUID] = mapped_column(ForeignKey("claims.id"), index=True)
+    source_id: Mapped[UUID] = mapped_column(ForeignKey("sources.id"))
+    source_snapshot_id: Mapped[UUID] = mapped_column(ForeignKey("source_snapshots.id"))
+    relation: Mapped[str] = mapped_column(String(32))
+    payload_json: Mapped[dict] = mapped_column(JSON)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class ReviewDecisionRow(Base):
+    __tablename__ = "review_decisions"
+    id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
+    project_id: Mapped[UUID] = mapped_column(ForeignKey("research_projects.id"), index=True)
+    reviewer_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    target_type: Mapped[str] = mapped_column(String(64), index=True)
+    target_id: Mapped[UUID] = mapped_column(Uuid, index=True)
+    decision: Mapped[str] = mapped_column(String(32))
+    reason: Mapped[str] = mapped_column(Text)
+    metadata_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), index=True)

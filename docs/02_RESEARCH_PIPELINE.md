@@ -99,3 +99,8 @@ structured planning metadata—not fetched bodies—and are saved after meaningf
 cancellation, and follow-up stopping policy are deterministic application concerns; a model may
 recommend work but cannot override those limits. Candidate observations remain unverified until
 Phase 6 evidence processing.
+
+## Phase 6 evidence boundary
+Evidence building converts candidate observations into normalized, fingerprinted claims, immutable
+links, source-independence clusters, reproducible confidence assessments, review decisions, skill
+graph records and knowledge gaps. Candidate text remains untrusted and cannot change policies.

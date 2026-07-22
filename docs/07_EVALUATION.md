@@ -59,3 +59,8 @@ Each case includes:
 - required sources
 - forbidden claims
 - rubric
+
+## Phase 6 quality gates
+Evaluate claim fingerprint stability, independence-aware corroboration, contradiction scope matching,
+direct reported-question provenance, confidence component reproducibility, review auditability, and
+acyclic skill relationships.

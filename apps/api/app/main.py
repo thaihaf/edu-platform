@@ -11,9 +11,11 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
+from packages.application.evidence import EvidenceService
 from packages.application.ingestion import IngestionError, IngestionService, TextDocumentParser
 from packages.application.research import ResearchService
 from packages.application.services import ConflictError, DomainService, NotFoundError
+from packages.domain.evidence import EvidenceError, ReviewDecisionType
 from packages.domain.models import (
     Course,
     CourseVersion,
@@ -25,6 +27,7 @@ from packages.domain.models import (
 )
 from packages.domain.ports import ReadinessProbe
 from packages.domain.research import ResearchError
+from packages.infrastructure.evidence import InMemoryEvidenceRepository
 from packages.infrastructure.ingestion import (
     DeterministicEmbeddingProvider,
     InMemoryChunkRepository,
@@ -524,6 +527,13 @@ async def research_artifact(job_id: UUID, artifact: str, request: Request) -> An
 @app.post("/api/v1/research-jobs/{job_id}/{action}")
 async def research_control(job_id: UUID, action: str, request: Request) -> Any:
     try:
+        if action == "build-evidence":
+            key = request.headers.get("Idempotency-Key")
+            if not key:
+                return _research_error(
+                    request, ResearchError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required")
+                )
+            return {"research_job_id": job_id, "status": "ACCEPTED"}
         if action == "cancel":
             return await _research_service.cancel(job_id)
         if action == "resume":
@@ -543,3 +553,94 @@ async def research_control(job_id: UUID, action: str, request: Request) -> Any:
         )
     except ResearchError as exc:
         return _research_error(request, exc)
+
+
+# Phase 6 routes delegate to deterministic application policies.
+
+_evidence_repository = InMemoryEvidenceRepository()
+_evidence_service = EvidenceService(_evidence_repository)
+
+
+@app.get("/api/v1/projects/{project_id}/claims")
+async def list_claims(project_id: UUID) -> list[Any]:
+    return [c for c in _evidence_repository.claims.values() if c.project_id == project_id]
+
+
+@app.get("/api/v1/claims/{claim_id}")
+async def get_claim(claim_id: UUID, request: Request) -> Any:
+    claim = await _evidence_repository.get_claim(claim_id)
+    if not claim:
+        return _evidence_error(request, EvidenceError("CLAIM_NOT_FOUND", "Claim not found"))
+    return claim
+
+
+@app.get("/api/v1/claims/{claim_id}/evidence")
+async def claim_evidence(claim_id: UUID) -> list[Any]:
+    return await _evidence_repository.links_for_claim(claim_id)
+
+
+@app.get("/api/v1/claims/{claim_id}/contradictions")
+async def claim_contradictions(claim_id: UUID) -> list[Any]:
+    return [
+        x
+        for x in await _evidence_repository.links_for_claim(claim_id)
+        if x.relation.value == "CONTRADICTS"
+    ]
+
+
+@app.post("/api/v1/claims/{claim_id}/recalculate-confidence")
+async def recalculate_claim(claim_id: UUID, request: Request) -> Any:
+    try:
+        return await _evidence_service.recalculate(claim_id)
+    except EvidenceError as exc:
+        return _evidence_error(request, exc)
+
+
+class EvidenceReviewIn(BaseModel):
+    reviewer_id: UUID
+    decision: ReviewDecisionType
+    reason: str = Field(min_length=1)
+
+
+@app.post("/api/v1/claims/{claim_id}/review")
+async def review_claim(claim_id: UUID, body: EvidenceReviewIn, request: Request) -> Any:
+    try:
+        return await _evidence_service.review_claim(
+            claim_id, body.reviewer_id, body.decision, body.reason
+        )
+    except EvidenceError as exc:
+        return _evidence_error(request, exc)
+
+
+@app.get("/api/v1/review-decisions")
+async def review_decisions(
+    target_type: str | None = None, target_id: UUID | None = None, reviewer_id: UUID | None = None
+) -> list[Any]:
+    return [
+        x
+        for x in _evidence_repository.decisions
+        if (not target_type or x.target_type == target_type)
+        and (not target_id or x.target_id == target_id)
+        and (not reviewer_id or x.reviewer_id == reviewer_id)
+    ]
+
+
+def _evidence_error(request: Request, exc: EvidenceError) -> JSONResponse:
+    http = (
+        404
+        if exc.code.endswith("NOT_FOUND")
+        else 409
+        if exc.code in {"IDEMPOTENCY_CONFLICT", "INVALID_CLAIM_TRANSITION"}
+        else 422
+    )
+    return JSONResponse(
+        status_code=http,
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "details": {},
+                "trace_id": request.headers.get("X-Trace-ID", ""),
+            }
+        },
+    )
