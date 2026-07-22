@@ -223,25 +223,6 @@ def _pinned_request(
     return request
 
 
-async def _pinned_get(
-    client: httpx.AsyncClient | None,
-    url: str,
-    addresses: tuple[str, ...],
-    *,
-    follow_redirects: bool,
-    headers: dict[str, str],
-) -> httpx.Response:
-    if client:
-        return await client.send(
-            _pinned_request(client, url, addresses, headers), follow_redirects=follow_redirects
-        )
-    async with httpx.AsyncClient(follow_redirects=False, cookies=None) as owned_client:
-        return await owned_client.send(
-            _pinned_request(owned_client, url, addresses, headers),
-            follow_redirects=follow_redirects,
-        )
-
-
 async def _pinned_stream_get(
     client: httpx.AsyncClient | None,
     url: str,
@@ -275,8 +256,13 @@ async def _pinned_stream_get(
 class HttpRobotsPolicy:
     """Fail closed on a robots retrieval failure; its client must be SSRF-safe."""
 
-    def __init__(self, resolver: SystemDNSResolver, client: httpx.AsyncClient | None = None):
-        self.resolver, self.client = resolver, client
+    def __init__(
+        self,
+        resolver: SystemDNSResolver,
+        client: httpx.AsyncClient | None = None,
+        max_bytes: int = 64_000,
+    ):
+        self.resolver, self.client, self.max_bytes = resolver, client, max_bytes
 
     async def may_fetch(self, url: str, user_agent: str) -> bool:
         from urllib.robotparser import RobotFileParser
@@ -285,11 +271,11 @@ class HttpRobotsPolicy:
         base = urlsplit(safe)
         robots = f"{base.scheme}://{base.netloc}/robots.txt"
         try:
-            response = await _pinned_get(
+            response, content = await _pinned_stream_get(
                 self.client,
                 robots,
                 addresses,
-                follow_redirects=False,
+                max_bytes=self.max_bytes,
                 headers={"User-Agent": user_agent},
             )
             if response.status_code == 404:
@@ -297,9 +283,11 @@ class HttpRobotsPolicy:
             if response.status_code >= 400:
                 return False
             parser = RobotFileParser()
-            parser.parse(response.text.splitlines())
+            parser.parse(
+                content.decode(response.encoding or "utf-8", errors="replace").splitlines()
+            )
             return parser.can_fetch(user_agent, safe)
-        except httpx.HTTPError:
+        except (httpx.HTTPError, SearchError):
             return False
 
 

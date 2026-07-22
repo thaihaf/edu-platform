@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
@@ -24,7 +26,7 @@ from packages.domain.models import (
     Workspace,
 )
 from packages.domain.ports import ReadinessProbe
-from packages.domain.search import FetchJob, QueryFamily, SearchQuery
+from packages.domain.search import FetchJob, FetchStage, FetchStatus, QueryFamily, SearchQuery
 from packages.infrastructure.ingestion import (
     DeterministicEmbeddingProvider,
     InMemoryChunkRepository,
@@ -34,7 +36,7 @@ from packages.infrastructure.ingestion import (
 from packages.infrastructure.logging import configure_logging
 from packages.infrastructure.memory import MemoryUnitOfWork
 from packages.infrastructure.readiness import create_readiness_probes
-from packages.infrastructure.search import SearXNGProvider
+from packages.infrastructure.search import HttpCrawlProvider, SearXNGProvider, SystemDNSResolver
 from packages.infrastructure.settings import Settings, get_settings
 
 logger = structlog.get_logger(__name__)
@@ -441,6 +443,68 @@ def _phase4_routes(app: FastAPI, settings: Settings) -> None:
     search = SearchService(repository, [SearXNGProvider(settings.searxng_url)])
     fetch_jobs: dict[UUID, FetchJob] = {}
     fetch_events: dict[UUID, list[dict[str, object]]] = {}
+    crawler = HttpCrawlProvider(SystemDNSResolver())
+    app.state.fetch_crawler = crawler
+
+    def record(job: FetchJob) -> None:
+        fetch_events[job.id].append(
+            {
+                "stage": job.stage,
+                "status": job.status,
+                "error_code": job.error_code,
+            }
+        )
+
+    async def run_fetch(job_id: UUID) -> None:
+        """Execute an accepted fetch and persist its resulting immutable snapshot."""
+        job = fetch_jobs[job_id]
+        job.status, job.stage, job.started_at = (
+            FetchStatus.RUNNING,
+            FetchStage.FETCHING,
+            datetime.now(UTC),
+        )
+        record(job)
+        try:
+            document = await app.state.fetch_crawler.crawl_page(job.requested_url)
+            async with app.state.memory_uow as uow:
+                snapshots = await uow.snapshots.list_for_source(job.source_id)
+                snapshot = SourceSnapshot(
+                    job.source_id,
+                    len(snapshots) + 1,
+                    None,
+                    document.raw_content_hash,
+                    {
+                        "canonical_url": document.canonical_url,
+                        "final_url": document.final_url,
+                        "normalized_content_hash": document.normalized_content_hash,
+                        "normalized_markdown": document.normalized_markdown,
+                    },
+                )
+                await uow.snapshots.add(snapshot)
+            job.canonical_url = document.canonical_url
+            job.final_url = document.final_url
+            job.content_type = str(document.http_metadata.get("content_type", "text/html"))
+            job.status, job.stage, job.completed_at = (
+                FetchStatus.COMPLETED,
+                FetchStage.COMPLETED,
+                datetime.now(UTC),
+            )
+        except SearchError as exc:
+            job.status, job.error_code, job.error_message, job.failed_at = (
+                FetchStatus.BLOCKED if exc.code == "ROBOTS_DISALLOWED" else FetchStatus.FAILED,
+                exc.code,
+                str(exc),
+                datetime.now(UTC),
+            )
+        except Exception:
+            logger.exception("fetch_job_failed", fetch_job_id=str(job.id))
+            job.status, job.error_code, job.error_message, job.failed_at = (
+                FetchStatus.FAILED,
+                "FETCH_FAILED",
+                "Fetch worker failed",
+                datetime.now(UTC),
+            )
+        record(job)
 
     def trace(request: Request) -> str:
         return request.headers.get("X-Trace-ID", "")
@@ -539,6 +603,7 @@ def _phase4_routes(app: FastAPI, settings: Settings) -> None:
         job = FetchJob(source.project_id, source_id, url, url, key, trace(request))
         fetch_jobs[job.id] = job
         fetch_events[job.id] = [{"stage": job.stage, "status": job.status}]
+        asyncio.create_task(run_fetch(job.id))
         return job
 
     @app.get("/api/v1/fetch-jobs/{job_id}")

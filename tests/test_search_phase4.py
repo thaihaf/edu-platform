@@ -25,6 +25,7 @@ from packages.infrastructure.search import (
     FakeSearchProvider,
     HtmlContentNormalizer,
     HttpCrawlProvider,
+    HttpRobotsPolicy,
     SearXNGProvider,
 )
 
@@ -155,6 +156,16 @@ def test_http_crawler_enforces_robots_before_fetching() -> None:
                 await HttpCrawlProvider(
                     Resolver(("8.8.8.8",)), client, robots_policy=DenyRobots()
                 ).fetch_url("https://public.test")
+
+    asyncio.run(run())
+
+
+def test_robots_response_is_bounded_and_fails_closed() -> None:
+    async def run() -> None:
+        transport = httpx.MockTransport(lambda request: httpx.Response(200, content=b"x" * 11))
+        async with httpx.AsyncClient(transport=transport) as client:
+            policy = HttpRobotsPolicy(Resolver(("8.8.8.8",)), client, max_bytes=10)
+            assert not await policy.may_fetch("https://public.test/page", "test-bot")
 
     asyncio.run(run())
 
