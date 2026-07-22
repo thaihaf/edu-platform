@@ -6,12 +6,14 @@ import hashlib
 import ipaddress
 import posixpath
 import re
+from collections.abc import AsyncIterator, Mapping
 from dataclasses import dataclass, field
 from datetime import datetime
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 from uuid import UUID
 
 from packages.domain.models import SourceSnapshot
+from packages.domain.ports import ObjectStorage
 from packages.domain.search import (
     FetchJob,
     FetchStage,
@@ -211,6 +213,16 @@ class InMemoryFetchRepository:
     snapshots: dict[UUID, SourceSnapshot] = field(default_factory=dict)
     snapshot_jobs: dict[UUID, UUID] = field(default_factory=dict)
 
+    async def next_snapshot_version(self, source_id: UUID) -> int:
+        return 1 + max(
+            (
+                snapshot.snapshot_version
+                for snapshot in self.snapshots.values()
+                if snapshot.source_id == source_id
+            ),
+            default=0,
+        )
+
     async def create_job(self, job: FetchJob, request_hash: str) -> FetchJob:
         existing = self.idempotency.get(job.idempotency_key)
         if existing:
@@ -244,6 +256,38 @@ class FetchDispatcher:
     async def dispatch(self, job_id: UUID) -> None: ...
 
 
+async def _content(data: bytes) -> AsyncIterator[bytes]:
+    yield data
+
+
+@dataclass
+class InMemoryFetchContentStorage:
+    """Immutable content-store adapter for fetch-service tests and local execution."""
+
+    objects: dict[str, tuple[bytes, dict[str, str]]] = field(default_factory=dict)
+
+    async def put_object(
+        self, key: str, content: AsyncIterator[bytes], metadata: Mapping[str, str]
+    ) -> None:
+        data = b"".join([chunk async for chunk in content])
+        existing = self.objects.get(key)
+        if existing and existing[0] != data:
+            raise SearchError("SNAPSHOT_PERSISTENCE_FAILED", "Content reference is not immutable")
+        self.objects[key] = (data, dict(metadata))
+
+    async def get_object(self, key: str) -> AsyncIterator[bytes]:
+        return _content(self.objects[key][0])
+
+    async def delete_object(self, key: str) -> None:
+        self.objects.pop(key, None)
+
+    async def object_exists(self, key: str) -> bool:
+        return key in self.objects
+
+    async def get_object_metadata(self, key: str) -> Mapping[str, str]:
+        return self.objects[key][1]
+
+
 class FetchService:
     """Coordinates durable fetch-job transitions and immutable snapshot persistence."""
 
@@ -252,8 +296,10 @@ class FetchService:
         repository: InMemoryFetchRepository,
         crawler: CrawlProvider,
         dispatcher: FetchDispatcher,
+        content_storage: ObjectStorage | None = None,
     ):
         self.repository, self.crawler, self.dispatcher = repository, crawler, dispatcher
+        self.content_storage = content_storage or InMemoryFetchContentStorage()
 
     async def accept(self, job: FetchJob) -> FetchJob:
         request_hash = hashlib.sha256(
@@ -285,10 +331,22 @@ class FetchService:
             await self.repository.update_job(job)
             snapshot = await self.repository.snapshot_for_job(job.id)
             if not snapshot:
+                # The normalized document is the immutable fetch artifact consumed by ingestion.
+                content = document.normalized_markdown.encode("utf-8")
+                reference = f"fetch-snapshots/{job.source_id}/{document.raw_content_hash}.md"
+                await self.content_storage.put_object(
+                    reference,
+                    _content(content),
+                    {
+                        "content-hash": document.raw_content_hash,
+                        "content-type": "text/markdown; charset=utf-8",
+                        "source-id": str(job.source_id),
+                    },
+                )
                 snapshot = SourceSnapshot(
                     job.source_id,
-                    1,
-                    None,
+                    await self.repository.next_snapshot_version(job.source_id),
+                    reference,
                     document.raw_content_hash,
                     {"canonical_url": document.canonical_url, "fetch_job_id": str(job.id)},
                 )

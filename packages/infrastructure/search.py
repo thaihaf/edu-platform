@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 import hashlib
 import socket
+from contextlib import asynccontextmanager
 from datetime import datetime
 from html.parser import HTMLParser
 from urllib.parse import urljoin, urlsplit
@@ -218,35 +219,40 @@ class HttpRobotsPolicy:
             redirects = 0
             while True:
                 current = await validate_public_url(current, self.resolver)
-                response = await self._get(current)
-                if response.is_redirect:
-                    redirects += 1
-                    location = response.headers.get("location")
-                    if not location or redirects > 5:
+                async with self._stream_get(current) as response:
+                    if response.is_redirect:
+                        redirects += 1
+                        location = response.headers.get("location")
+                        if not location or redirects > 5:
+                            return False
+                        current = urljoin(current, location)
+                        continue
+                    if response.status_code == 404:
+                        return True
+                    if response.status_code != 200:
                         return False
-                    current = urljoin(current, location)
-                    continue
-                if response.status_code == 404:
-                    return True
-                if response.status_code != 200:
-                    return False
-                content = await self._read_limited(response)
-                parser = RobotFileParser()
-                parser.parse(content.decode("utf-8", errors="replace").splitlines())
-                return parser.can_fetch(user_agent, safe)
+                    content = await self._read_limited(response)
+                    parser = RobotFileParser()
+                    parser.parse(content.decode("utf-8", errors="replace").splitlines())
+                    return parser.can_fetch(user_agent, safe)
         except (httpx.HTTPError, SearchError, ValueError, UnicodeError):
             return False
 
-    async def _get(self, url: str) -> httpx.Response:
-        # The hostname URL is retained so HTTP Host and HTTPS SNI remain the original host.
-        # validate_public_url resolves and validates every target before each connection.
+    @asynccontextmanager
+    async def _stream_get(self, url: str):
+        """Yield a response without buffering its (decompressed) body in memory."""
         headers = {"Host": urlsplit(url).netloc, "User-Agent": "ai-course-research-bot/0.1"}
-        if self.client:
-            return await self.client.get(
-                url, follow_redirects=False, headers=headers, timeout=self.timeout
-            )
-        async with httpx.AsyncClient(follow_redirects=False, timeout=self.timeout) as client:
-            return await client.get(url, headers=headers)
+        client = self.client or httpx.AsyncClient(follow_redirects=False, timeout=self.timeout)
+        try:
+            request = client.build_request("GET", url, headers=headers)
+            response = await client.send(request, stream=True, follow_redirects=False)
+            try:
+                yield response
+            finally:
+                await response.aclose()
+        finally:
+            if self.client is None:
+                await client.aclose()
 
     async def _read_limited(self, response: httpx.Response) -> bytes:
         declared = response.headers.get("content-length")
@@ -280,12 +286,14 @@ class HttpCrawlProvider:
         self.robots = robots
 
     async def fetch_url(self, url: str) -> bytes:
-        if self.robots and not await self.robots.may_fetch(url, "ai-course-research-bot/0.1"):
-            raise SearchError("ROBOTS_DENIED", "robots.txt disallows this URL")
         current = url
         redirects = 0
         while True:
             await validate_public_url(current, self.resolver)
+            if self.robots and not await self.robots.may_fetch(
+                current, "ai-course-research-bot/0.1"
+            ):
+                raise SearchError("ROBOTS_DENIED", "robots.txt disallows this URL")
             try:
                 if self.client:
                     response = await self.client.get(
