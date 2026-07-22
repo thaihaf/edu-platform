@@ -32,8 +32,22 @@ def upgrade() -> None:
         sa.UniqueConstraint("project_id", "fingerprint", name="uq_claim_project_fingerprint"),
     )
     op.create_index("ix_claims_project_status", "claims", ["project_id", "status"])
-    for name in (
+    op.create_table(
         "evidence_links",
+        sa.Column("id", sa.Uuid(), primary_key=True),
+        sa.Column("project_id", sa.Uuid(), sa.ForeignKey("research_projects.id"), nullable=False),
+        sa.Column("claim_id", sa.Uuid(), sa.ForeignKey("claims.id"), nullable=False),
+        sa.Column("source_id", sa.Uuid(), sa.ForeignKey("sources.id"), nullable=False),
+        sa.Column(
+            "source_snapshot_id", sa.Uuid(), sa.ForeignKey("source_snapshots.id"), nullable=False
+        ),
+        sa.Column("relation", sa.String(32), nullable=False),
+        sa.Column("payload_json", sa.JSON(), nullable=False),
+        sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+    )
+    op.create_index("ix_evidence_links_project", "evidence_links", ["project_id"])
+    op.create_index("ix_evidence_links_claim", "evidence_links", ["claim_id"])
+    for name in (
         "source_independence_clusters",
         "claim_confidence_assessments",
         "reported_questions",
@@ -63,9 +77,11 @@ def downgrade() -> None:
         "reported_questions",
         "claim_confidence_assessments",
         "source_independence_clusters",
-        "evidence_links",
     ):
         op.drop_index(f"ix_{name}_project", table_name=name)
         op.drop_table(name)
+    op.drop_index("ix_evidence_links_claim", table_name="evidence_links")
+    op.drop_index("ix_evidence_links_project", table_name="evidence_links")
+    op.drop_table("evidence_links")
     op.drop_index("ix_claims_project_status", table_name="claims")
     op.drop_table("claims")

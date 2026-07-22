@@ -533,7 +533,17 @@ async def research_control(job_id: UUID, action: str, request: Request) -> Any:
                 return _research_error(
                     request, ResearchError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required")
                 )
-            return {"research_job_id": job_id, "status": "ACCEPTED"}
+            job = await _research_service.get(job_id)
+            observations = await _research_workflow.artifacts.list(job_id, "observation")
+            try:
+                claims = await _evidence_service.build(job.project_id, observations, key)
+            except EvidenceError as exc:
+                return _evidence_error(request, exc)
+            return {
+                "research_job_id": job_id,
+                "status": "COMPLETED",
+                "claims_created": len(claims),
+            }
         if action == "cancel":
             return await _research_service.cancel(job_id)
         if action == "resume":
