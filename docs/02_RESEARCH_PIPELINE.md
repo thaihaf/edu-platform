@@ -85,3 +85,10 @@ Each search result must include:
 - Contradiction resolution.
 - Source independence.
 - Citation completeness.
+
+## Phase 4 discovery and fetch boundary
+Phase 4 accepts explicit query families and query strings only. Providers are fused with
+reciprocal-rank fusion (RRF, k=60), with provider rank and provenance retained on each
+canonical-URL duplicate cluster. Public URL fetches are subject to DNS-based SSRF checks,
+robots policy, byte/type/redirect limits and normalized immutable snapshots. AI planning,
+claim extraction, and research loops remain later phases.

@@ -61,3 +61,12 @@ Use:
 - Audit all admin changes.
 - Redact PII when possible.
 - Configure retention.
+
+## Phase 4 enforcement policy
+Every public-web request, including `robots.txt` and each redirect, is parsed, denied for
+credentials/non-HTTP(S), resolved through the DNS boundary, and denied when any answer is
+non-global (including loopback, private, link-local, multicast, reserved and metadata
+addresses). Fetching is GET-only, cookie/auth-free, redirect-limited, MIME/byte-limited and
+never executes JavaScript. Robots failures fail closed; a robots denial is recorded as an
+access decision rather than treated as a network failure. Browser automation is disabled by
+default and must not bypass login, CAPTCHA, paywalls, or robots.

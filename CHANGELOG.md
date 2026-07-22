@@ -27,3 +27,7 @@ All notable changes to this project are documented in this file.
 ### Added
 - Phase 2 domain entities, lifecycle rules, repository ports, use cases, SQLAlchemy metadata, and Alembic schema migration.
 - `/api/v1` workspace, project, source/snapshot, and course-version foundation endpoints with trace-aware errors.
+
+## Phase 4 — Search and crawling
+- Added provider-neutral web search/fetch contracts, deterministic SearXNG mapping and safe mocked adapters.
+- Added URL canonicalization, DNS-based SSRF checks, redirect validation, robots fail-closed policy, HTML normalization, RRF fusion, and disabled browser boundary.
