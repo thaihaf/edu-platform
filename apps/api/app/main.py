@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 import structlog
-from fastapi import FastAPI, Request, Response, status
+from fastapi import BackgroundTasks, FastAPI, Request, Response, status
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
@@ -676,7 +676,20 @@ class CourseGenerationIn(BaseModel):
 
 
 def _course_service() -> CourseService:
-    return CourseService(_course_repository, list(_evidence_repository.claims.values()), [], {})
+    links_by_claim: dict[UUID, list[Any]] = {}
+    for link in _evidence_repository.links.values():
+        links_by_claim.setdefault(link.claim_id, []).append(link)
+    return CourseService(
+        _course_repository, list(_evidence_repository.claims.values()), [], links_by_claim
+    )
+
+
+async def _run_course_generation(job_id: UUID) -> None:
+    """Run a queued in-process job without letting a failed job break its response."""
+    try:
+        await _course_service().generate(job_id)
+    except CourseError as exc:
+        logger.warning("course_generation_failed", job_id=str(job_id), code=exc.code)
 
 
 def _course_error(request: Request, exc: CourseError) -> JSONResponse:
@@ -699,7 +712,7 @@ def _course_error(request: Request, exc: CourseError) -> JSONResponse:
 
 @app.post("/api/v1/projects/{project_id}/course-generation-jobs", status_code=202)
 async def start_course_generation(
-    project_id: UUID, body: CourseGenerationIn, request: Request
+    project_id: UUID, body: CourseGenerationIn, request: Request, background_tasks: BackgroundTasks
 ) -> Any:
     key = request.headers.get("Idempotency-Key")
     if not key:
@@ -722,7 +735,11 @@ async def start_course_generation(
         request_fingerprint=fingerprint(data),
     )
     try:
-        return await _course_service().start(job)
+        job = await _course_service().start(job)
+        # The in-process adapter has no external worker. Schedule the orchestration
+        # after returning the accepted job so polling clients observe terminal state.
+        background_tasks.add_task(_run_course_generation, job.id)
+        return job
     except CourseError as exc:
         return _course_error(request, exc)
 
