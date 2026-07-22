@@ -210,9 +210,23 @@ def test_fetch_lifecycle_dispatch_failure_crawl_failure_snapshot_failure_and_rep
         assert dispatch.calls == [job.id]
         assert (await service.run(job.id)).status is FetchStatus.COMPLETED
         assert len(repo.snapshots) == 1
+        snapshot = next(iter(repo.snapshots.values()))
+        assert snapshot.snapshot_version == 1 and snapshot.raw_content_reference
         assert (await service.run(job.id)).status is FetchStatus.COMPLETED and len(
             repo.snapshots
         ) == 1
+
+        second_job = FetchJob(
+            job.project_id,
+            job.source_id,
+            "https://example.test/second",
+            "https://example.test/second",
+            "key-second",
+            "t",
+        )
+        await service.accept(second_job)
+        assert (await service.run(second_job.id)).status is FetchStatus.COMPLETED
+        assert sorted(snapshot.snapshot_version for snapshot in repo.snapshots.values()) == [1, 2]
 
         failed_dispatch = FetchJob(
             uuid4(), uuid4(), "https://example.test/b", "https://example.test/b", "key2", "t"
@@ -279,5 +293,22 @@ def test_robots_streaming_limits_redirect_and_crawl4ai_denial() -> None:
             await Crawl4AIProvider(Resolver(("8.8.8.8",)), robots=Deny()).crawl_page(
                 "https://e.test/x"
             )
+
+        checked: list[str] = []
+
+        class RedirectDeny:
+            async def may_fetch(self, url, agent):
+                checked.append(url)
+                return not url.endswith("/blocked")
+
+        redirects = httpx.MockTransport(
+            lambda _: httpx.Response(302, headers={"location": "/blocked"})
+        )
+        async with httpx.AsyncClient(transport=redirects) as client:
+            with pytest.raises(SearchError, match="robots"):
+                await HttpCrawlProvider(
+                    Resolver(("8.8.8.8",)), client=client, robots=RedirectDeny()
+                ).fetch_url("https://e.test/allowed")
+        assert checked == ["https://e.test/allowed", "https://e.test/blocked"]
 
     asyncio.run(run())
