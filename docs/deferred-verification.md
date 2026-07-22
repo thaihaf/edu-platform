@@ -28,3 +28,4 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | Redis/Celery research execution and API-to-worker flow | Docker unavailable | e2e | run worker and API end-to-end suite with Redis/Celery |
 | Live SearXNG/Crawl4AI orchestration | Docker/browser runtime unavailable | integration | run approved provider orchestration fixtures |
 | Real structured-output model, token and cost accounting | no model credentials/provider configured | integration | configure provider then run model contract suite |
+| API-to-worker research execution | API deliberately only queues work; no worker/Redis runtime available | e2e | run worker with Redis and invoke `POST /api/v1/projects/{id}/research-jobs` |

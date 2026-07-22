@@ -113,3 +113,11 @@ Without Docker, run `make check`, `pytest -m "not integration and not e2e"`,
 `alembic upgrade head --sql`, and static YAML parsing for `docker-compose.yml`.
 The Docker and PostgreSQL checks deferred by the environment are listed in
 `docs/deferred-verification.md`.
+
+### Phase 5 development without Docker
+
+Docker is not required for deterministic Phase 5 unit tests. Install the development
+extras and run `pytest -m "not integration and not e2e"`. The in-memory workflow runner
+is a test adapter only; production research requires a worker, LangGraph, PostgreSQL
+checkpoint storage, and the configured search/fetch/model providers. See
+`docs/deferred-verification.md` for the commands that need that environment.

@@ -1,4 +1,7 @@
-"""Framework- and provider-independent Phase 5 research contracts."""
+"""Provider-neutral Phase 5 research workflow contracts.
+
+The state deliberately stores source and artifact identifiers, never fetched bodies.
+"""
 
 from __future__ import annotations
 
@@ -97,6 +100,7 @@ class ResearchJob:
     policy_version: str = "phase5.v1"
     request_hash: str = ""
     cancellation_requested: bool = False
+    stop_reason: str | None = None
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utcnow)
     updated_at: datetime = field(default_factory=utcnow)
@@ -174,7 +178,7 @@ class PlannedQuery:
 
     @property
     def fingerprint(self) -> str:
-        return sha256(" ".join(self.text.lower().split()).encode()).hexdigest()
+        return sha256(" ".join(self.text.casefold().split()).encode()).hexdigest()
 
 
 @dataclass(frozen=True)
@@ -183,6 +187,8 @@ class SourceSelection:
     selected: bool
     reason: str
     rejection_reason: str | None = None
+    score_components: dict[str, float] = field(default_factory=dict)
+    duplicate_cluster_id: str | None = None
     expected_information_gain: float = 0.0
 
 
@@ -196,24 +202,28 @@ class ResearchObservation:
     normalized_text: str
     source_chunk_ids: tuple[UUID, ...] = ()
     verbatim_span: str | None = None
+    page_reference: str | None = None
     section_reference: str | None = None
     directness: float = 0.0
     extraction_confidence: float = 0.0
     temporal_reference: str | None = None
     entities: tuple[str, ...] = ()
     metadata: dict[str, Any] = field(default_factory=dict)
-    model: str = "deterministic"
-    prompt_version: str = "phase5.v1"
+    model_provider: str = "deterministic"
+    model_name: str = "fake"
+    prompt_name: str = "observation_extraction"
+    prompt_version: str = "v1"
+    schema_version: str = "v1"
     id: UUID = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=utcnow)
 
     def __post_init__(self) -> None:
-        if (
-            self.observation_type is ObservationType.REPORTED_QUESTION_CANDIDATE
-            and not self.verbatim_span
+        if self.observation_type is ObservationType.REPORTED_QUESTION_CANDIDATE and not (
+            self.verbatim_span or self.page_reference or self.section_reference
         ):
             raise ResearchError(
-                "RESEARCH_EXTRACTION_FAILED", "Reported-question candidates require a source span"
+                "RESEARCH_EXTRACTION_FAILED",
+                "Reported-question candidates require a source location",
             )
 
 
@@ -228,6 +238,9 @@ class ResearchGap:
     suggested_queries: tuple[str, ...]
     estimated_value: float
     status: str = "OPEN"
+    id: UUID = field(default_factory=uuid4)
+    research_job_id: UUID | None = None
+    created_at: datetime = field(default_factory=utcnow)
 
 
 @dataclass(frozen=True)
@@ -245,6 +258,31 @@ class CoverageReport:
     weakly_supported_areas: tuple[str, ...] = ()
     failed_source_impact: tuple[str, ...] = ()
     marginal_information_gain: float = 0.0
+
+
+@dataclass(frozen=True)
+class ResearchResult:
+    research_job_id: UUID
+    research_brief: ResearchBrief | None
+    executed_query_ids: tuple[UUID, ...]
+    selected_source_ids: tuple[UUID, ...]
+    coverage: CoverageReport | None
+    gaps: tuple[ResearchGap, ...]
+    observation_ids: tuple[UUID, ...]
+    warnings: tuple[str, ...]
+    stop_reason: str
+    workflow_version: str
+    model_metadata: tuple[dict[str, Any], ...] = ()
+
+
+@dataclass(frozen=True)
+class ResearchEvent:
+    event_type: str
+    research_job_id: UUID
+    message: str
+    node: str | None = None
+    metadata: dict[str, Any] = field(default_factory=dict)
+    created_at: datetime = field(default_factory=utcnow)
 
 
 @dataclass
@@ -284,8 +322,8 @@ class ResearchState:
 class ResearchWorkflow(Protocol):
     async def start(self, job: ResearchJob, state: ResearchState) -> None: ...
     async def resume(self, job_id: UUID) -> None: ...
-    async def cancel(self, job_id: UUID) -> None: ...
     async def retry(self, job_id: UUID) -> None: ...
+    async def cancel(self, job_id: UUID) -> None: ...
     async def get_state(self, job_id: UUID) -> ResearchState: ...
     async def get_progress(self, job_id: UUID) -> ResearchJob: ...
 
@@ -298,10 +336,29 @@ class ResearchCheckpointStore(Protocol):
 
 
 class ResearchModel(Protocol):
-    async def understand_goal(self, *args: Any, **kwargs: Any) -> dict[str, Any]: ...
+    async def understand_goal(self, state: ResearchState) -> dict[str, Any]: ...
+    async def create_research_brief(self, state: ResearchState) -> ResearchBrief: ...
+    async def generate_aliases(self, brief: ResearchBrief) -> dict[str, tuple[str, ...]]: ...
+    async def plan_queries(self, state: ResearchState) -> tuple[PlannedQuery, ...]: ...
+    async def assist_source_selection(self, state: ResearchState) -> dict[UUID, float]: ...
+    async def extract_research_observations(
+        self, state: ResearchState
+    ) -> tuple[ResearchObservation, ...]: ...
+    async def analyze_gaps(self, state: ResearchState) -> tuple[ResearchGap, ...]: ...
+    async def plan_followup_queries(self, state: ResearchState) -> tuple[PlannedQuery, ...]: ...
+    async def assemble_research_result(self, state: ResearchState) -> ResearchResult: ...
 
 
 class ResearchJobRepository(Protocol):
     async def get(self, id: UUID) -> ResearchJob | None: ...
     async def by_key(self, key: str) -> ResearchJob | None: ...
     async def save(self, job: ResearchJob) -> ResearchJob: ...
+
+
+class ResearchEventPublisher(Protocol):
+    async def publish(self, event: ResearchEvent) -> None: ...
+
+
+class ResearchArtifactRepository(Protocol):
+    async def save(self, job_id: UUID, kind: str, payload: Any) -> UUID: ...
+    async def list(self, job_id: UUID, kind: str | None = None) -> list[Any]: ...
