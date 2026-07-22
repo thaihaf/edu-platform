@@ -4,7 +4,9 @@ import asyncio
 from uuid import uuid4
 
 import pytest
+from fastapi.encoders import jsonable_encoder
 
+from apps.api.app.main import source_snapshot_response
 from packages.application.ingestion import (
     ChunkingConfig,
     IngestionError,
@@ -25,6 +27,7 @@ from packages.infrastructure.ingestion import (
     InMemoryIngestionJobRepository,
     InMemoryProgressPublisher,
 )
+from packages.infrastructure.memory import MemoryRepository
 
 
 @pytest.mark.parametrize(
@@ -59,6 +62,8 @@ def test_text_ingestion_is_normalized_chunked_and_embedded() -> None:
             TextDocumentParser(),
             DeterministicEmbeddingProvider(),
             InMemoryProgressPublisher(),
+            MemoryRepository(),
+            MemoryRepository("snapshot_version"),
         )
         source, snapshot, job = await service.ingest_text(
             uuid4(), "Notes", "# Intro\r\n\r\nOne two three", "key-1", "trace"
@@ -85,3 +90,57 @@ def test_chunking_is_deterministic() -> None:
         assert [x.chunk_hash for x in chunk_document(doc, uuid4(), ChunkingConfig())] != []
 
     asyncio.run(run())
+
+
+def test_text_parser_preserves_content_after_inline_heading() -> None:
+    async def run() -> None:
+        document = await TextDocumentParser().parse(b"# Intro\nBody", "text/plain")
+
+        assert document.sections[0].heading == "Intro"
+        assert document.sections[0].blocks[0].text == "Body"
+        assert chunk_document(document, uuid4())
+
+    asyncio.run(run())
+
+
+def test_ingestion_persists_created_source_and_snapshot() -> None:
+    async def run() -> None:
+        chunks = InMemoryChunkRepository()
+        jobs = InMemoryIngestionJobRepository()
+        sources = MemoryRepository()
+        snapshots = MemoryRepository("snapshot_version")
+        service = IngestionService(
+            jobs,
+            chunks,
+            TextDocumentParser(),
+            DeterministicEmbeddingProvider(),
+            InMemoryProgressPublisher(),
+            sources,
+            snapshots,
+        )
+
+        source, snapshot, _ = await service.ingest_text(
+            uuid4(), "Notes", "Content", "key-2", "trace"
+        )
+
+        assert await sources.get(source.id) is source
+        assert await snapshots.list_for_source(source.id) == [snapshot]
+
+        url_source, _ = await service.register_url(
+            uuid4(), "https://example.com", None, "key-3", "trace"
+        )
+        assert await sources.get(url_source.id) is url_source
+
+    asyncio.run(run())
+
+
+def test_snapshot_response_copies_immutable_metadata() -> None:
+    from packages.domain.models import SourceSnapshot
+
+    snapshot = SourceSnapshot(uuid4(), 1, None, "hash", {"normalized": True})
+
+    response = source_snapshot_response(snapshot)
+
+    assert response["metadata_json"] == {"normalized": True}
+    assert isinstance(response["metadata_json"], dict)
+    assert jsonable_encoder(response)["metadata_json"] == {"normalized": True}

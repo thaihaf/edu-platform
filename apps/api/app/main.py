@@ -181,6 +181,19 @@ class UrlIngestionIn(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+def source_snapshot_response(snapshot: SourceSnapshot) -> dict[str, Any]:
+    """Return an API DTO without leaking immutable domain implementation details."""
+    return {
+        "id": snapshot.id,
+        "source_id": snapshot.source_id,
+        "snapshot_version": snapshot.snapshot_version,
+        "raw_content_reference": snapshot.raw_content_reference,
+        "content_hash": snapshot.content_hash,
+        "metadata_json": dict(snapshot.metadata_json),
+        "captured_at": snapshot.captured_at,
+    }
+
+
 def _phase2_routes(app: FastAPI) -> None:
     memory_uow = MemoryUnitOfWork()
     service = DomainService(lambda: memory_uow)
@@ -193,6 +206,8 @@ def _phase2_routes(app: FastAPI) -> None:
         TextDocumentParser(),
         DeterministicEmbeddingProvider(),
         progress_publisher,
+        memory_uow.sources,
+        memory_uow.snapshots,
     )
 
     def trace(request: Request) -> str:
@@ -283,7 +298,11 @@ def _phase2_routes(app: FastAPI) -> None:
         source, snapshot, job = await ingestion.ingest_text(
             project_id, body.title, body.text, key, trace(request), body.language
         )
-        return {"source": source, "source_snapshot": snapshot, "ingestion_job": job}
+        return {
+            "source": source,
+            "source_snapshot": source_snapshot_response(snapshot),
+            "ingestion_job": job,
+        }
 
     @app.post("/api/v1/projects/{project_id}/sources/url", status_code=202)
     async def register_url(
