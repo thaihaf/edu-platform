@@ -1,6 +1,43 @@
-# AI Course Research Platform — Codex Execution Kit
+# AI Course Research Platform
 
-Bộ tài liệu này giúp Codex xây dựng tuần tự một nền tảng nghiên cứu sâu và tạo khóa học bằng AI từ:
+An AI Research & Assessment Platform that turns a learning goal and source set into
+a researched, cited, versioned course and assessment bank.
+
+## Local setup
+
+### Prerequisites
+
+- Docker Engine with Docker Compose v2
+- Python 3.12+
+
+### Run the platform
+
+Run these commands exactly from the repository root:
+
+```bash
+cp .env.example .env
+docker compose up --build -d
+curl --fail http://localhost:8000/health/live
+curl --fail http://localhost:8000/health/ready
+```
+
+The API OpenAPI documentation is available at <http://localhost:8000/docs>. Local
+infrastructure is available at PostgreSQL (`localhost:5432`), Redis
+(`localhost:6379`), MinIO console (<http://localhost:9001>), and SearXNG
+(<http://localhost:8080>). Stop the stack with `docker compose down`.
+
+### Run quality checks
+
+```bash
+python3.12 -m venv .venv
+. .venv/bin/activate
+pip install -e ".[dev]"
+make check
+```
+
+## Platform vision
+
+Bộ tài liệu này giúp triển khai tuần tự một nền tảng nghiên cứu sâu và tạo khóa học bằng AI từ:
 
 - Mô tả tự do
 - URL
