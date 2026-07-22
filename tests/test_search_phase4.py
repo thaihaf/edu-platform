@@ -128,12 +128,52 @@ def test_html_normalization_removes_scripts_and_extracts_metadata() -> None:
 def test_http_redirect_revalidated() -> None:
     async def run() -> None:
         transport = httpx.MockTransport(
-            lambda request: httpx.Response(302, headers={"location": "http://internal.test"})
+            lambda request: (
+                httpx.Response(404)
+                if request.url.path == "/robots.txt"
+                else httpx.Response(302, headers={"location": "http://internal.test"})
+            )
         )
         async with httpx.AsyncClient(transport=transport) as client:
             with pytest.raises(SearchError):
                 await HttpCrawlProvider(Resolver(("8.8.8.8",)), client).fetch_url(
                     "https://public.test"
                 )
+
+    asyncio.run(run())
+
+
+def test_http_crawler_enforces_robots_before_fetching() -> None:
+    class DenyRobots:
+        async def may_fetch(self, url: str, user_agent: str) -> bool:
+            return False
+
+    async def run() -> None:
+        transport = httpx.MockTransport(lambda request: httpx.Response(200, text="<p>ok</p>"))
+        async with httpx.AsyncClient(transport=transport) as client:
+            with pytest.raises(SearchError, match="Robots"):
+                await HttpCrawlProvider(
+                    Resolver(("8.8.8.8",)), client, robots_policy=DenyRobots()
+                ).fetch_url("https://public.test")
+
+    asyncio.run(run())
+
+
+def test_http_crawler_stops_streaming_at_byte_limit() -> None:
+    class AllowRobots:
+        async def may_fetch(self, url: str, user_agent: str) -> bool:
+            return True
+
+    async def run() -> None:
+        transport = httpx.MockTransport(
+            lambda request: httpx.Response(
+                200, content=b"x" * 11, headers={"content-type": "text/html"}
+            )
+        )
+        async with httpx.AsyncClient(transport=transport) as client:
+            with pytest.raises(SearchError, match="byte limit"):
+                await HttpCrawlProvider(
+                    Resolver(("8.8.8.8",)), client, max_bytes=10, robots_policy=AllowRobots()
+                ).fetch_url("https://public.test")
 
     asyncio.run(run())

@@ -12,6 +12,7 @@ from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
 from packages.application.ingestion import IngestionError, IngestionService, TextDocumentParser
+from packages.application.search import InMemorySearchRepository, SearchError, SearchService
 from packages.application.services import ConflictError, DomainService, NotFoundError
 from packages.domain.models import (
     Course,
@@ -23,6 +24,7 @@ from packages.domain.models import (
     Workspace,
 )
 from packages.domain.ports import ReadinessProbe
+from packages.domain.search import FetchJob, QueryFamily, SearchQuery
 from packages.infrastructure.ingestion import (
     DeterministicEmbeddingProvider,
     InMemoryChunkRepository,
@@ -32,6 +34,7 @@ from packages.infrastructure.ingestion import (
 from packages.infrastructure.logging import configure_logging
 from packages.infrastructure.memory import MemoryUnitOfWork
 from packages.infrastructure.readiness import create_readiness_probes
+from packages.infrastructure.search import SearXNGProvider
 from packages.infrastructure.settings import Settings, get_settings
 
 logger = structlog.get_logger(__name__)
@@ -181,9 +184,36 @@ class UrlIngestionIn(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
+class SearchQueryIn(BaseModel):
+    query_text: str = Field(min_length=1)
+    query_family: QueryFamily = QueryFamily.DIRECT
+    language: str | None = None
+    locale: str | None = None
+    domains_allowlist: tuple[str, ...] = ()
+    domains_denylist: tuple[str, ...] = ()
+    file_types: tuple[str, ...] = ()
+    max_results: int = Field(default=10, ge=1, le=100)
+
+
+class SearchQueryBatchIn(BaseModel):
+    queries: list[SearchQueryIn] = Field(min_length=1, max_length=100)
+
+
+class SearchResultAcceptIn(BaseModel):
+    workspace_id: UUID
+    actor_id: UUID
+    title: str | None = None
+
+
+class FetchRequestIn(BaseModel):
+    url: str | None = None
+
+
 def _phase2_routes(app: FastAPI) -> None:
     memory_uow = MemoryUnitOfWork()
     service = DomainService(lambda: memory_uow)
+    app.state.memory_uow = memory_uow
+    app.state.domain_service = service
     chunk_repository = InMemoryChunkRepository()
     job_repository = InMemoryIngestionJobRepository()
     progress_publisher = InMemoryProgressPublisher()
@@ -403,3 +433,134 @@ def _phase2_routes(app: FastAPI) -> None:
 
 
 _phase2_routes(app)
+
+
+def _phase4_routes(app: FastAPI, settings: Settings) -> None:
+    """Register Phase 4 endpoints over the same in-process boundary as Phase 2."""
+    repository = InMemorySearchRepository()
+    search = SearchService(repository, [SearXNGProvider(settings.searxng_url)])
+    fetch_jobs: dict[UUID, FetchJob] = {}
+    fetch_events: dict[UUID, list[dict[str, object]]] = {}
+
+    def trace(request: Request) -> str:
+        return request.headers.get("X-Trace-ID", "")
+
+    @app.exception_handler(SearchError)
+    async def search_error(request: Request, exc: SearchError) -> JSONResponse:
+        return JSONResponse(
+            status_code=404 if exc.code == "SEARCH_RESULT_NOT_FOUND" else 422,
+            content={
+                "error": {
+                    "code": exc.code,
+                    "message": str(exc),
+                    "details": {},
+                    "trace_id": trace(request),
+                }
+            },
+        )
+
+    @app.post("/api/v1/projects/{project_id}/search-queries", status_code=201)
+    async def create_search_query(project_id: UUID, body: SearchQueryIn) -> SearchQuery:
+        return await search.register(SearchQuery(project_id=project_id, **body.model_dump()))
+
+    @app.post("/api/v1/projects/{project_id}/search-queries/batch", status_code=201)
+    async def create_search_queries(
+        project_id: UUID, body: SearchQueryBatchIn
+    ) -> list[SearchQuery]:
+        return [
+            await search.register(SearchQuery(project_id=project_id, **query.model_dump()))
+            for query in body.queries
+        ]
+
+    @app.post("/api/v1/search-queries/{query_id}/execute")
+    async def execute_search_query(query_id: UUID, request: Request) -> list[Any]:
+        key = request.headers.get("Idempotency-Key")
+        if not key:
+            raise SearchError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required")
+        return await search.execute(query_id, key)
+
+    @app.get("/api/v1/projects/{project_id}/search-queries")
+    async def list_search_queries(project_id: UUID) -> list[SearchQuery]:
+        return [query for query in repository.queries.values() if query.project_id == project_id]
+
+    @app.get("/api/v1/search-queries/{query_id}")
+    async def get_search_query(query_id: UUID) -> SearchQuery:
+        query = repository.queries.get(query_id)
+        if not query:
+            raise SearchError("SEARCH_RESULT_NOT_FOUND", "Search query not found")
+        return query
+
+    @app.get("/api/v1/search-queries/{query_id}/results")
+    async def get_search_results(query_id: UUID) -> list[Any]:
+        if query_id not in repository.queries:
+            raise SearchError("SEARCH_RESULT_NOT_FOUND", "Search query not found")
+        return repository.results.get(query_id, [])
+
+    @app.post("/api/v1/search-results/{result_id}/accept", status_code=201)
+    async def accept_search_result(
+        result_id: UUID, body: SearchResultAcceptIn, request: Request
+    ) -> Source:
+        result = next(
+            (
+                item
+                for values in repository.results.values()
+                for item in values
+                if item.id == result_id
+            ),
+            None,
+        )
+        if not result:
+            raise SearchError("SEARCH_RESULT_NOT_FOUND", "Search result not found")
+        query = repository.queries[result.query_id]
+        return await app.state.domain_service.create_source(
+            Source(query.project_id, "WEB", body.title or result.title, result.canonical_url),
+            body.workspace_id,
+            body.actor_id,
+            trace(request),
+        )
+
+    @app.post("/api/v1/sources/{source_id}/fetch", status_code=202)
+    async def request_fetch(source_id: UUID, body: FetchRequestIn, request: Request) -> FetchJob:
+        key = request.headers.get("Idempotency-Key")
+        if not key:
+            raise SearchError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required")
+        async with app.state.memory_uow as uow:
+            source = await uow.sources.get(source_id)
+        if not source:
+            raise NotFoundError("Source not found")
+        url = body.url or source.canonical_url
+        if not url:
+            raise SearchError("SEARCH_QUERY_INVALID", "A source URL is required")
+        existing = next((job for job in fetch_jobs.values() if job.idempotency_key == key), None)
+        if existing:
+            if existing.source_id != source_id or existing.requested_url != url:
+                raise SearchError("IDEMPOTENCY_CONFLICT", "Idempotency key payload differs")
+            return existing
+        job = FetchJob(source.project_id, source_id, url, url, key, trace(request))
+        fetch_jobs[job.id] = job
+        fetch_events[job.id] = [{"stage": job.stage, "status": job.status}]
+        return job
+
+    @app.get("/api/v1/fetch-jobs/{job_id}")
+    async def get_fetch_job(job_id: UUID) -> FetchJob:
+        job = fetch_jobs.get(job_id)
+        if not job:
+            raise NotFoundError("Fetch job not found")
+        return job
+
+    @app.get("/api/v1/fetch-jobs/{job_id}/events")
+    async def get_fetch_events(job_id: UUID) -> list[dict[str, object]]:
+        if job_id not in fetch_jobs:
+            raise NotFoundError("Fetch job not found")
+        return fetch_events[job_id]
+
+    @app.get("/api/v1/snapshots/{snapshot_id}")
+    async def get_snapshot(snapshot_id: UUID) -> SourceSnapshot:
+        async with app.state.memory_uow as uow:
+            snapshot = await uow.snapshots.get(snapshot_id)
+        if not snapshot:
+            raise NotFoundError("Source snapshot not found")
+        return snapshot
+
+
+_phase4_routes(app, get_settings())
