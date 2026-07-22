@@ -60,3 +60,8 @@ Outputs:
 The LangGraph adapter is behind a framework-independent workflow port. Nodes use versioned
 structured prompts and treat delimited source material as untrusted data; source text cannot invoke
 tools, reveal secrets, import code, change policy, or promote itself to trusted status.
+
+## Phase 6 evidence policy
+Optional normalization/classification models provide structured suggestions only. Deterministic
+fingerprint, independence, confidence and verification policies remain authoritative and retain
+prompt/schema metadata without exposing raw model output.

@@ -75,3 +75,7 @@ default and must not bypass login, CAPTCHA, paywalls, or robots.
 Research prompts delimit source content and require structured output. Injection-like phrases are
 recorded as suspicious source metadata, never executed as instructions. Only existing policy-bound
 search/fetch/ingestion services may be used by workflow nodes.
+
+## Phase 6 evidence protection
+Observation text, spans and source metadata are untrusted. They are normalized as data and cannot
+mark a source official, set confidence, approve claims, alter clusters, or create unsupported evidence.

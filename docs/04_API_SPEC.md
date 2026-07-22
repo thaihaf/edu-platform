@@ -100,3 +100,8 @@ chunk metadata without object-storage URLs.
 queues a workflow state and never executes research in the request. Job status, events, brief,
 queries, sources, observations, coverage, gaps and result are available under `/research-jobs/{id}`.
 `cancel`, `resume`, and `retry` are explicit job-control operations and return structured errors with trace IDs.
+
+## Phase 6 evidence and knowledge
+Evidence build is `POST /research-jobs/{job_id}/build-evidence` with `Idempotency-Key`. Claims,
+evidence, contradictions, confidence recalculation and reviews are exposed at `/claims`; review
+history is available at `/review-decisions`. Responses retain the standard typed error and trace-ID contract.

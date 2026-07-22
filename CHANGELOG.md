@@ -36,3 +36,6 @@ All notable changes to this project are documented in this file.
 - Added provider-neutral, resumable research-job contracts, typed checkpoint state, budget and lifecycle controls, and asynchronous job-control API surface.
 - Added deterministic node-runner checkpoints, immutable artifact persistence, idempotent finalization, versioned structured prompt descriptors, and injection-safe source delimiters for unit testing.
 - Declared the optional-at-runtime LangGraph workflow adapter and documented deferred live orchestration verification.
+
+## Phase 6
+- Added deterministic evidence and knowledge graph foundations, claim fingerprints, confidence policy, immutable evidence links, review decisions and relational migration groundwork.
