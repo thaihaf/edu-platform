@@ -11,7 +11,11 @@ from datetime import datetime
 from urllib.parse import quote, unquote, urlsplit, urlunsplit
 from uuid import UUID
 
+from packages.domain.models import SourceSnapshot
 from packages.domain.search import (
+    FetchJob,
+    FetchStage,
+    FetchStatus,
     ProviderSearchResult,
     QueryStatus,
     SearchOptions,
@@ -19,7 +23,7 @@ from packages.domain.search import (
     SearchResult,
     SearchResultPage,
 )
-from packages.domain.search_ports import DNSResolver, SearchProvider
+from packages.domain.search_ports import CrawlProvider, DNSResolver, SearchProvider
 
 
 class SearchError(Exception):
@@ -196,3 +200,112 @@ class SearchService:
         except SearchError:
             query.status = QueryStatus.FAILED
             raise
+
+
+@dataclass
+class InMemoryFetchRepository:
+    """Durable-boundary test adapter; production adapters must make these writes transactional."""
+
+    jobs: dict[UUID, FetchJob] = field(default_factory=dict)
+    idempotency: dict[str, tuple[str, UUID]] = field(default_factory=dict)
+    snapshots: dict[UUID, SourceSnapshot] = field(default_factory=dict)
+    snapshot_jobs: dict[UUID, UUID] = field(default_factory=dict)
+
+    async def create_job(self, job: FetchJob, request_hash: str) -> FetchJob:
+        existing = self.idempotency.get(job.idempotency_key)
+        if existing:
+            if existing[0] != request_hash:
+                raise SearchError("IDEMPOTENCY_CONFLICT", "Idempotency key payload differs")
+            return self.jobs[existing[1]]
+        self.jobs[job.id] = job
+        self.idempotency[job.idempotency_key] = (request_hash, job.id)
+        return job
+
+    async def get_job(self, job_id: UUID) -> FetchJob | None:
+        return self.jobs.get(job_id)
+
+    async def update_job(self, job: FetchJob) -> None:
+        self.jobs[job.id] = job
+
+    async def snapshot_for_job(self, job_id: UUID) -> SourceSnapshot | None:
+        snapshot_id = self.snapshot_jobs.get(job_id)
+        return self.snapshots.get(snapshot_id) if snapshot_id else None
+
+    async def create_snapshot(self, job_id: UUID, snapshot: SourceSnapshot) -> SourceSnapshot:
+        existing = await self.snapshot_for_job(job_id)
+        if existing:
+            return existing
+        self.snapshots[snapshot.id] = snapshot
+        self.snapshot_jobs[job_id] = snapshot.id
+        return snapshot
+
+
+class FetchDispatcher:
+    async def dispatch(self, job_id: UUID) -> None: ...
+
+
+class FetchService:
+    """Coordinates durable fetch-job transitions and immutable snapshot persistence."""
+
+    def __init__(
+        self,
+        repository: InMemoryFetchRepository,
+        crawler: CrawlProvider,
+        dispatcher: FetchDispatcher,
+    ):
+        self.repository, self.crawler, self.dispatcher = repository, crawler, dispatcher
+
+    async def accept(self, job: FetchJob) -> FetchJob:
+        request_hash = hashlib.sha256(
+            f"{job.project_id}:{job.source_id}:{job.canonical_url}".encode()
+        ).hexdigest()
+        persisted = await self.repository.create_job(job, request_hash)
+        if persisted.id != job.id:  # idempotent replay: never dispatch again
+            return persisted
+        try:
+            await self.dispatcher.dispatch(persisted.id)
+        except Exception:
+            self._fail(persisted, "DISPATCH_FAILED", "Crawler dispatch failed")
+            await self.repository.update_job(persisted)
+        return persisted
+
+    async def run(self, job_id: UUID) -> FetchJob:
+        job = await self.repository.get_job(job_id)
+        if not job:
+            raise SearchError("FETCH_JOB_NOT_FOUND", "Fetch job not found")
+        if job.status is FetchStatus.COMPLETED:
+            return job
+        try:
+            job.status, job.stage = FetchStatus.RUNNING, FetchStage.FETCHING
+            job.started_at = job.started_at or datetime.now().astimezone()
+            job.error_code = job.error_message = None
+            await self.repository.update_job(job)
+            document = await self.crawler.crawl_page(job.requested_url)
+            job.stage = FetchStage.SNAPSHOTTING
+            await self.repository.update_job(job)
+            snapshot = await self.repository.snapshot_for_job(job.id)
+            if not snapshot:
+                snapshot = SourceSnapshot(
+                    job.source_id,
+                    1,
+                    None,
+                    document.raw_content_hash,
+                    {"canonical_url": document.canonical_url, "fetch_job_id": str(job.id)},
+                )
+                await self.repository.create_snapshot(job.id, snapshot)
+            job.status, job.stage = FetchStatus.COMPLETED, FetchStage.COMPLETED
+            job.completed_at = datetime.now().astimezone()
+            await self.repository.update_job(job)
+        except SearchError as exc:
+            self._fail(job, exc.code, str(exc))
+            await self.repository.update_job(job)
+        except Exception:
+            self._fail(job, "SNAPSHOT_PERSISTENCE_FAILED", "Fetch processing failed")
+            await self.repository.update_job(job)
+        return job
+
+    @staticmethod
+    def _fail(job: FetchJob, code: str, message: str) -> None:
+        job.status = FetchStatus.FAILED
+        job.error_code, job.error_message = code, message
+        job.failed_at = datetime.now().astimezone()

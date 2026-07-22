@@ -5,7 +5,7 @@ import hashlib
 import socket
 from datetime import datetime
 from html.parser import HTMLParser
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlsplit
 
 import httpx
 
@@ -195,34 +195,69 @@ class DisabledBrowserProvider:
 
 
 class HttpRobotsPolicy:
-    """Fail closed on a robots retrieval failure; its client must be SSRF-safe."""
+    """Fail-closed robots client with redirect-by-redirect SSRF validation."""
 
-    def __init__(self, resolver: SystemDNSResolver, client: httpx.AsyncClient | None = None):
-        self.resolver, self.client = resolver, client
+    max_bytes = 64 * 1024
+
+    def __init__(
+        self,
+        resolver: SystemDNSResolver,
+        client: httpx.AsyncClient | None = None,
+        timeout: float = 5,
+    ):
+        self.resolver, self.client, self.timeout = resolver, client, timeout
 
     async def may_fetch(self, url: str, user_agent: str) -> bool:
         from urllib.parse import urlsplit
         from urllib.robotparser import RobotFileParser
 
-        safe = await validate_public_url(url, self.resolver)
-        base = urlsplit(safe)
-        robots = f"{base.scheme}://{base.netloc}/robots.txt"
-        await validate_public_url(robots, self.resolver)
         try:
-            if self.client:
-                response = await self.client.get(robots, follow_redirects=False)
-            else:
-                async with httpx.AsyncClient() as c:
-                    response = await c.get(robots, follow_redirects=False)
-            if response.status_code == 404:
-                return True
-            if response.status_code >= 400:
-                return False
-            parser = RobotFileParser()
-            parser.parse(response.text.splitlines())
-            return parser.can_fetch(user_agent, safe)
-        except httpx.HTTPError:
+            safe = await validate_public_url(url, self.resolver)
+            base = urlsplit(safe)
+            current = f"{base.scheme}://{base.netloc}/robots.txt"
+            redirects = 0
+            while True:
+                current = await validate_public_url(current, self.resolver)
+                response = await self._get(current)
+                if response.is_redirect:
+                    redirects += 1
+                    location = response.headers.get("location")
+                    if not location or redirects > 5:
+                        return False
+                    current = urljoin(current, location)
+                    continue
+                if response.status_code == 404:
+                    return True
+                if response.status_code != 200:
+                    return False
+                content = await self._read_limited(response)
+                parser = RobotFileParser()
+                parser.parse(content.decode("utf-8", errors="replace").splitlines())
+                return parser.can_fetch(user_agent, safe)
+        except (httpx.HTTPError, SearchError, ValueError, UnicodeError):
             return False
+
+    async def _get(self, url: str) -> httpx.Response:
+        # The hostname URL is retained so HTTP Host and HTTPS SNI remain the original host.
+        # validate_public_url resolves and validates every target before each connection.
+        headers = {"Host": urlsplit(url).netloc, "User-Agent": "ai-course-research-bot/0.1"}
+        if self.client:
+            return await self.client.get(
+                url, follow_redirects=False, headers=headers, timeout=self.timeout
+            )
+        async with httpx.AsyncClient(follow_redirects=False, timeout=self.timeout) as client:
+            return await client.get(url, headers=headers)
+
+    async def _read_limited(self, response: httpx.Response) -> bytes:
+        declared = response.headers.get("content-length")
+        if declared and int(declared) > self.max_bytes:
+            raise ValueError("robots response exceeds limit")
+        content = bytearray()
+        async for chunk in response.aiter_bytes():  # decoded bytes: limit is post-decompression
+            content.extend(chunk)
+            if len(content) > self.max_bytes:
+                raise ValueError("robots response exceeds limit")
+        return bytes(content)
 
 
 class HttpCrawlProvider:
@@ -233,6 +268,7 @@ class HttpCrawlProvider:
         client: httpx.AsyncClient | None = None,
         max_bytes: int = 2_000_000,
         redirect_limit: int = 5,
+        robots: HttpRobotsPolicy | None = None,
     ):
         self.resolver, self.normalizer, self.client, self.max_bytes, self.redirect_limit = (
             resolver,
@@ -241,8 +277,11 @@ class HttpCrawlProvider:
             max_bytes,
             redirect_limit,
         )
+        self.robots = robots
 
     async def fetch_url(self, url: str) -> bytes:
+        if self.robots and not await self.robots.may_fetch(url, "ai-course-research-bot/0.1"):
+            raise SearchError("ROBOTS_DENIED", "robots.txt disallows this URL")
         current = url
         redirects = 0
         while True:
@@ -294,6 +333,8 @@ class Crawl4AIProvider(HttpCrawlProvider):
 
     async def crawl_page(self, url: str) -> NormalizedWebDocument:
         await validate_public_url(url, self.resolver)
+        if self.robots and not await self.robots.may_fetch(url, "ai-course-research-bot/0.1"):
+            raise SearchError("ROBOTS_DENIED", "robots.txt disallows this URL")
         try:
             from crawl4ai import AsyncWebCrawler  # type: ignore[import-not-found]
         except ImportError as exc:

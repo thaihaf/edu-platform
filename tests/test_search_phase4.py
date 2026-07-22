@@ -137,3 +137,147 @@ def test_http_redirect_revalidated() -> None:
                 )
 
     asyncio.run(run())
+
+
+class _Dispatcher:
+    def __init__(self, fail: bool = False):
+        self.fail, self.calls = fail, []
+
+    async def dispatch(self, job_id):
+        self.calls.append(job_id)
+        if self.fail:
+            raise RuntimeError("queue down")
+
+
+class _Crawler:
+    def __init__(self, failure: Exception | None = None):
+        self.failure, self.calls = failure, 0
+
+    async def crawl_page(self, url):
+        from datetime import UTC, datetime
+
+        from packages.domain.search import NormalizedWebDocument
+
+        self.calls += 1
+        if self.failure:
+            raise self.failure
+        return NormalizedWebDocument(
+            url,
+            url,
+            url,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            None,
+            "text",
+            "text",
+            (),
+            (),
+            None,
+            {},
+            (),
+            "raw",
+            "normalized",
+            datetime.now(UTC),
+            {},
+        )
+
+
+def test_fetch_lifecycle_dispatch_failure_crawl_failure_snapshot_failure_and_replay() -> None:
+    from packages.application.search import FetchService, InMemoryFetchRepository
+    from packages.domain.search import FetchJob, FetchStatus
+
+    async def run() -> None:
+        repo = InMemoryFetchRepository()
+        dispatch = _Dispatcher()
+        crawler = _Crawler()
+        service = FetchService(repo, crawler, dispatch)
+        job = FetchJob(
+            uuid4(), uuid4(), "https://example.test/a", "https://example.test/a", "key", "t"
+        )
+        accepted = await service.accept(job)
+        assert dispatch.calls == [job.id] and accepted.status is FetchStatus.PENDING
+        assert (
+            await service.accept(
+                FetchJob(
+                    job.project_id, job.source_id, job.requested_url, job.canonical_url, "key", "t"
+                )
+            )
+        ).id == job.id
+        assert dispatch.calls == [job.id]
+        assert (await service.run(job.id)).status is FetchStatus.COMPLETED
+        assert len(repo.snapshots) == 1
+        assert (await service.run(job.id)).status is FetchStatus.COMPLETED and len(
+            repo.snapshots
+        ) == 1
+
+        failed_dispatch = FetchJob(
+            uuid4(), uuid4(), "https://example.test/b", "https://example.test/b", "key2", "t"
+        )
+        assert (
+            await FetchService(repo, crawler, _Dispatcher(True)).accept(failed_dispatch)
+        ).status is FetchStatus.FAILED
+        failed_crawl = FetchJob(
+            uuid4(), uuid4(), "https://example.test/c", "https://example.test/c", "key3", "t"
+        )
+        service2 = FetchService(repo, _Crawler(SearchError("CRAWL_FAILED", "nope")), dispatch)
+        await service2.accept(failed_crawl)
+        assert (await service2.run(failed_crawl.id)).status is FetchStatus.FAILED
+
+        original = repo.create_snapshot
+
+        async def fail_snapshot(*args):
+            raise RuntimeError("db down")
+
+        repo.create_snapshot = fail_snapshot  # type: ignore[method-assign]
+        persist_fail = FetchJob(
+            uuid4(), uuid4(), "https://example.test/d", "https://example.test/d", "key4", "t"
+        )
+        await service.accept(persist_fail)
+        assert (await service.run(persist_fail.id)).status is FetchStatus.FAILED
+        repo.create_snapshot = original  # type: ignore[method-assign]
+
+    asyncio.run(run())
+
+
+def test_robots_streaming_limits_redirect_and_crawl4ai_denial() -> None:
+    from packages.infrastructure.search import Crawl4AIProvider, HttpRobotsPolicy
+
+    async def run() -> None:
+        huge = b"x" * (64 * 1024 + 1)
+        transport = httpx.MockTransport(lambda _: httpx.Response(200, content=huge))
+        async with httpx.AsyncClient(transport=transport) as client:
+            assert not await HttpRobotsPolicy(Resolver(("8.8.8.8",)), client).may_fetch(
+                "https://e.test/x", "bot"
+            )
+        import gzip
+
+        compressed = gzip.compress(huge)
+        transport = httpx.MockTransport(
+            lambda _: httpx.Response(200, headers={"content-encoding": "gzip"}, content=compressed)
+        )
+        async with httpx.AsyncClient(transport=transport) as client:
+            assert not await HttpRobotsPolicy(Resolver(("8.8.8.8",)), client).may_fetch(
+                "https://e.test/x", "bot"
+            )
+        redirects = httpx.MockTransport(
+            lambda request: httpx.Response(302, headers={"location": "http://127.0.0.1/robots.txt"})
+        )
+        async with httpx.AsyncClient(transport=redirects) as client:
+            assert not await HttpRobotsPolicy(Resolver(("8.8.8.8",)), client).may_fetch(
+                "https://e.test/x", "bot"
+            )
+
+        class Deny:
+            async def may_fetch(self, url, agent):
+                return False
+
+        with pytest.raises(SearchError, match="robots"):
+            await Crawl4AIProvider(Resolver(("8.8.8.8",)), robots=Deny()).crawl_page(
+                "https://e.test/x"
+            )
+
+    asyncio.run(run())
