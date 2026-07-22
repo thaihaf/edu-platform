@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from hashlib import sha256
 from typing import Any
 from uuid import UUID
@@ -116,9 +117,15 @@ class CourseService:
             chosen, skills, reasons = self.selector.select(self.claims, self.skills, self.links)
             await self.r.event(job, "evidence_selected", reasons)
             job.advance(GenerationStage.PLANNING_CURRICULUM, 30)
+            course = await self.r.get_course(job.course_id) if job.course_id else None
+            if job.course_id and not course:
+                raise CourseError("COURSE_NOT_FOUND", "Requested course does not exist")
+            if course and course.project_id != job.project_id:
+                raise CourseError(
+                    "COURSE_PROJECT_MISMATCH", "Requested course does not belong to this project"
+                )
             plan = self.planner.plan(job, chosen, skills)
             await self.r.add_plan(plan)
-            course = await self.r.get_course(job.course_id) if job.course_id else None
             if not course:
                 course = Course(job.project_id, plan.title, plan.description)
                 await self.r.add_course(course)
@@ -159,7 +166,13 @@ class CourseService:
                     )
                     await self.r.add_objective(objective, lesson.id)
                     await self.r.add_lesson(lesson)
-                    link = self.links[claim.id][0]
+                    evidence_links = self.links.get(claim.id, [])
+                    if not evidence_links:
+                        raise CourseError(
+                            "MISSING_EVIDENCE_LINK",
+                            "Verified claim is missing an evidence link",
+                        )
+                    link = evidence_links[0]
                     block = ContentBlock(
                         lesson.id,
                         1,
@@ -242,9 +255,71 @@ class CourseService:
             len(await self.r.versions(old.course_id)) + 1,
             old.title,
             old.description,
-            dict(old.content_json),
+            deepcopy(dict(old.content_json)),
             old.created_by,
             parent_version_id=old.id,
         )
         await self.r.add_version(new, None)
+        for old_module in await self.r.modules(old.id):
+            module = Module(
+                new.id,
+                old_module.position,
+                old_module.title,
+                old_module.skill_ids,
+                old_module.description,
+                old_module.estimated_duration_minutes,
+                old_module.prerequisite_module_ids,
+            )
+            await self.r.add_module(module)
+            for old_lesson in await self.r.lessons(old_module.id):
+                lesson = Lesson(
+                    module.id,
+                    old_lesson.position,
+                    old_lesson.title,
+                    old_lesson.summary,
+                    prerequisite_skill_ids=old_lesson.prerequisite_skill_ids,
+                    estimated_duration_minutes=old_lesson.estimated_duration_minutes,
+                )
+                await self.r.add_lesson(lesson)
+                objective_ids = []
+                for objective in await self.r.objectives(old_lesson.id):
+                    copied_objective = LearningObjective(
+                        objective.objective_text,
+                        objective.measurable_verb,
+                        objective.bloom_level,
+                        objective.linked_skill_ids,
+                        objective.linked_claim_ids,
+                        lesson.id,
+                    )
+                    await self.r.add_objective(copied_objective, lesson.id)
+                    objective_ids.append(copied_objective.id)
+                lesson.learning_objective_ids = tuple(objective_ids)
+                for old_block in await self.r.blocks(old_lesson.id):
+                    block = ContentBlock(
+                        lesson.id,
+                        old_block.position,
+                        old_block.block_type,
+                        deepcopy(old_block.content_json),
+                        old_block.confidence_class,
+                        old_block.linked_claim_ids,
+                        old_block.linked_skill_ids,
+                        old_block.evidence_link_ids,
+                        old_block.prompt_version,
+                        old_block.attribution,
+                        old_block.locked,
+                    )
+                    await self.r.add_block(block)
+                    for citation in await self.r.citations(old_block.id):
+                        await self.r.add_citation(
+                            Citation(
+                                citation.project_id,
+                                new.id,
+                                citation.claim_id,
+                                citation.evidence_link_id,
+                                citation.source_id,
+                                citation.source_snapshot_id,
+                                block.id,
+                                citation.citation_type,
+                            )
+                        )
         return new
