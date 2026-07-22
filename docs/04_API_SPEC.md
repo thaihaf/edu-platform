@@ -77,3 +77,13 @@ create/list; course create/read; and course-version create/list/read/edit/publis
 Snapshots have no update route. Editing a non-draft course version returns the
 standard `409 CONFLICT` error contract. Create operations return `201`; reads and
 updates return `200`.
+
+## Phase 3 ingestion endpoints
+
+`POST /projects/{id}/sources/text` accepts title, text, optional language and metadata,
+and requires `Idempotency-Key`; it returns `202` with source, immutable snapshot, and
+job representations. `POST /projects/{id}/sources/url` validates and registers a
+canonical HTTP(S) URL only—Phase 3 never fetches it. `GET /ingestion-jobs/{id}` and
+`GET /ingestion-jobs/{id}/events` return in-process job state and persisted-style
+event records; `GET /sources/{source_id}/snapshots/{snapshot_id}/chunks` returns safe
+chunk metadata without object-storage URLs.

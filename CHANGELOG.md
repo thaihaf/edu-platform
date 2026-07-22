@@ -2,6 +2,14 @@
 
 All notable changes to this project are documented in this file.
 
+## [0.3.0] - 2026-07-22
+
+### Added
+- Vendor-neutral ingestion jobs, structured document/chunk domain models, ports,
+  deterministic in-memory adapters, plain-text parsing, chunking, embeddings, and
+  URL-registration validation.
+- Ingestion job/chunk persistence metadata and Phase 3 Alembic migration.
+
 ## [0.1.0] - 2026-07-22
 
 ### Added

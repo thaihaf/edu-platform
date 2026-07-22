@@ -11,6 +11,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
+from packages.application.ingestion import IngestionError, IngestionService, TextDocumentParser
 from packages.application.services import ConflictError, DomainService, NotFoundError
 from packages.domain.models import (
     Course,
@@ -22,6 +23,12 @@ from packages.domain.models import (
     Workspace,
 )
 from packages.domain.ports import ReadinessProbe
+from packages.infrastructure.ingestion import (
+    DeterministicEmbeddingProvider,
+    InMemoryChunkRepository,
+    InMemoryIngestionJobRepository,
+    InMemoryProgressPublisher,
+)
 from packages.infrastructure.logging import configure_logging
 from packages.infrastructure.memory import MemoryUnitOfWork
 from packages.infrastructure.readiness import create_readiness_probes
@@ -159,9 +166,34 @@ class VersionPatch(BaseModel):
     workspace_id: UUID
 
 
+class TextIngestionIn(BaseModel):
+    title: str = Field(min_length=1)
+    text: str = Field(min_length=1)
+    source_type: str = "TEXT"
+    language: str | None = None
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
+class UrlIngestionIn(BaseModel):
+    url: str
+    title: str | None = None
+    source_type: str = "URL"
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+
 def _phase2_routes(app: FastAPI) -> None:
     memory_uow = MemoryUnitOfWork()
     service = DomainService(lambda: memory_uow)
+    chunk_repository = InMemoryChunkRepository()
+    job_repository = InMemoryIngestionJobRepository()
+    progress_publisher = InMemoryProgressPublisher()
+    ingestion = IngestionService(
+        job_repository,
+        chunk_repository,
+        TextDocumentParser(),
+        DeterministicEmbeddingProvider(),
+        progress_publisher,
+    )
 
     def trace(request: Request) -> str:
         return request.headers.get("X-Trace-ID", "")
@@ -186,6 +218,20 @@ def _phase2_routes(app: FastAPI) -> None:
     @app.exception_handler(ConflictError)
     async def conflict(request: Request, exc: ConflictError) -> JSONResponse:
         return error_handler("CONFLICT", exc, request)
+
+    @app.exception_handler(IngestionError)
+    async def ingestion_error(request: Request, exc: IngestionError) -> JSONResponse:
+        return JSONResponse(
+            status_code=422,
+            content={
+                "error": {
+                    "code": exc.code,
+                    "message": str(exc),
+                    "details": {},
+                    "trace_id": trace(request),
+                }
+            },
+        )
 
     @app.post("/api/v1/workspaces", status_code=201)
     async def create_workspace(body: WorkspaceIn, request: Request) -> Workspace:
@@ -226,6 +272,45 @@ def _phase2_routes(app: FastAPI) -> None:
             body.actor_id,
             trace(request),
         )
+
+    @app.post("/api/v1/projects/{project_id}/sources/text", status_code=202)
+    async def ingest_text(
+        project_id: UUID, body: TextIngestionIn, request: Request
+    ) -> dict[str, Any]:
+        key = request.headers.get("Idempotency-Key")
+        if not key:
+            raise IngestionError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required")
+        source, snapshot, job = await ingestion.ingest_text(
+            project_id, body.title, body.text, key, trace(request), body.language
+        )
+        return {"source": source, "source_snapshot": snapshot, "ingestion_job": job}
+
+    @app.post("/api/v1/projects/{project_id}/sources/url", status_code=202)
+    async def register_url(
+        project_id: UUID, body: UrlIngestionIn, request: Request
+    ) -> dict[str, Any]:
+        key = request.headers.get("Idempotency-Key")
+        if not key:
+            raise IngestionError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required")
+        source, job = await ingestion.register_url(
+            project_id, body.url, body.title, key, trace(request)
+        )
+        return {"source": source, "ingestion_job": job}
+
+    @app.get("/api/v1/ingestion-jobs/{job_id}")
+    async def get_ingestion_job(job_id: UUID) -> Any:
+        job = await job_repository.get(job_id)
+        if not job:
+            raise NotFoundError("Ingestion job not found")
+        return job
+
+    @app.get("/api/v1/ingestion-jobs/{job_id}/events")
+    async def get_ingestion_events(job_id: UUID) -> list[dict[str, object]]:
+        return progress_publisher.events.get(job_id, [])
+
+    @app.get("/api/v1/sources/{source_id}/snapshots/{snapshot_id}/chunks")
+    async def get_snapshot_chunks(source_id: UUID, snapshot_id: UUID) -> list[Any]:
+        return await chunk_repository.list_by_snapshot(snapshot_id)
 
     @app.get("/api/v1/projects/{project_id}/sources")
     async def list_sources(project_id: UUID) -> list[Source]:
