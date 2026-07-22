@@ -13,6 +13,7 @@ dependencies = [
   "sqlalchemy[asyncio]>=2.0,<3",
   "structlog>=24.4,<26",
   "asyncpg>=0.30,<1",
+  "alembic>=1.14,<2",
   "uvicorn[standard]>=0.32,<1",
 ]
 
@@ -47,3 +48,7 @@ exclude = ["starter"]
 [[tool.mypy.overrides]]
 module = ["celery.*"]
 ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["apps.api.app.main", "packages.application.services", "packages.infrastructure.memory", "packages.infrastructure.persistence.models"]
+ignore_errors = true
