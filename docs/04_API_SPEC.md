@@ -87,3 +87,10 @@ canonical HTTP(S) URL only—Phase 3 never fetches it. `GET /ingestion-jobs/{id}
 `GET /ingestion-jobs/{id}/events` return in-process job state and persisted-style
 event records; `GET /sources/{source_id}/snapshots/{snapshot_id}/chunks` returns safe
 chunk metadata without object-storage URLs.
+
+## Phase 4 search and fetch endpoints
+- `POST /projects/{project_id}/search-queries`; `POST /projects/{project_id}/search-queries/batch`
+- `POST /search-queries/{query_id}/execute`; `GET /projects/{project_id}/search-queries`; `GET /search-queries/{query_id}`; `GET /search-queries/{query_id}/results`
+- `POST /search-results/{result_id}/accept`
+- `POST /sources/{source_id}/fetch` requires `Idempotency-Key` and returns `202`; `GET /fetch-jobs/{job_id}` and `/events`
+- `GET /sources/{source_id}/snapshots` and `/snapshots/{snapshot_id}` never return object-storage credentials.
