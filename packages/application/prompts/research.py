@@ -34,4 +34,7 @@ PROMPTS = {
 
 
 def delimit_source(content: str) -> str:
-    return f"<untrusted_source>\n{content}\n</untrusted_source>"
+    # Source text is untrusted: prevent it from closing (or opening) our data
+    # boundary when it is interpolated into a prompt.
+    escaped = content.replace("<", "&lt;").replace(">", "&gt;")
+    return f"<untrusted_source>\n{escaped}\n</untrusted_source>"
