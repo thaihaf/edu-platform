@@ -14,6 +14,7 @@ from packages.domain.evidence import (
     Skill,
     SkillType,
 )
+from packages.domain.models import Course
 from packages.infrastructure.course import InMemoryCourseRepository
 
 
@@ -41,6 +42,35 @@ def test_generation_is_idempotent_cited_and_publishable():
         assert (await service.publish(version.id)).status == "PUBLISHED"
         copy = await service.copy_as_draft(version.id)
         assert copy.parent_version_id == version.id
+        assert not await service.validate(copy.id)
+        assert len(await r.modules(copy.id)) == len(await r.modules(version.id))
+
+    asyncio.run(run())
+
+
+def test_generation_fails_cleanly_for_missing_evidence_link_and_wrong_project_course():
+    async def run():
+        project, claim, _, skill = fixtures()
+        repository = InMemoryCourseRepository()
+        service = CourseService(repository, [claim], [skill], {})
+        job = CourseGenerationJob(project, "missing-link", "Learn", "a", uuid4())
+        await service.start(job)
+        with pytest.raises(CourseError, match="missing an evidence link"):
+            await service.generate(job.id)
+        assert job.status == "FAILED"
+        assert job.error_code == "MISSING_EVIDENCE_LINK"
+        assert repository.events[job.id][-1]["stage"] == "failed"
+
+        other_course = Course(uuid4(), "Other project course", "")
+        await repository.add_course(other_course)
+        mismatched = CourseGenerationJob(
+            project, "wrong-project", "Learn", "a", uuid4(), course_id=other_course.id
+        )
+        await service.start(mismatched)
+        with pytest.raises(CourseError, match="does not belong"):
+            await service.generate(mismatched.id)
+        assert mismatched.status == "FAILED"
+        assert mismatched.error_code == "COURSE_PROJECT_MISMATCH"
 
     asyncio.run(run())
 
