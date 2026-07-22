@@ -23,6 +23,7 @@ dev = [
   "pytest-asyncio",
   "ruff",
   "mypy",
+  "aiosqlite",
 ]
 
 [tool.ruff]
@@ -30,4 +31,12 @@ line-length = 100
 target-version = "py312"
 
 [tool.pytest.ini_options]
-asyncio_mode = "auto"
+testpaths = ["tests"]
+pythonpath = ["apps/api", "packages/domain", "packages/infrastructure"]
+markers = ["integration: requires PostgreSQL and external infrastructure"]
+
+[tool.mypy]
+python_version = "3.12"
+files = ["apps", "packages"]
+ignore_missing_imports = true
+strict = true

@@ -1,7 +1,7 @@
-.PHONY: dev test lint typecheck
+.PHONY: dev test lint typecheck check
 
 dev:
-	docker compose -f docker-compose.dev.yml up -d
+	docker compose -f ../docker-compose.yml up -d
 
 test:
 	pytest
@@ -11,3 +11,5 @@ lint:
 
 typecheck:
 	mypy apps packages
+
+check: lint typecheck test
