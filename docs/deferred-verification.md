@@ -23,3 +23,8 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | MinIO snapshot persistence | Docker unavailable | integration | run snapshot object-storage suite |
 | Browser-provider execution | disabled by default; runtime unavailable | e2e | explicitly enable against public allowed fixture |
 | External network policy verification | external crawling prohibited in this environment | e2e | run approved public-network verification |
+| Live LangGraph checkpoint execution | LangGraph/package runtime and worker infrastructure unavailable | integration | install project dependencies and run a LangGraph worker/checkpointer suite |
+| PostgreSQL research checkpoint persistence | no PostgreSQL service | integration | run research repository tests against Compose PostgreSQL |
+| Redis/Celery research execution and API-to-worker flow | Docker unavailable | e2e | run worker and API end-to-end suite with Redis/Celery |
+| Live SearXNG/Crawl4AI orchestration | Docker/browser runtime unavailable | integration | run approved provider orchestration fixtures |
+| Real structured-output model, token and cost accounting | no model credentials/provider configured | integration | configure provider then run model contract suite |

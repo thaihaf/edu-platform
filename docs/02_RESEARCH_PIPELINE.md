@@ -92,3 +92,10 @@ reciprocal-rank fusion (RRF, k=60), with provider rank and provenance retained o
 canonical-URL duplicate cluster. Public URL fetches are subject to DNS-based SSRF checks,
 robots policy, byte/type/redirect limits and normalized immutable snapshots. AI planning,
 claim extraction, and research loops remain later phases.
+
+## Phase 5 orchestration boundary
+Phase 5 introduces a versioned, serializable research-job state. Checkpoints contain IDs and
+structured planning metadata—not fetched bodies—and are saved after meaningful nodes. Budgets,
+cancellation, and follow-up stopping policy are deterministic application concerns; a model may
+recommend work but cannot override those limits. Candidate observations remain unverified until
+Phase 6 evidence processing.

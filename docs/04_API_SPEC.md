@@ -94,3 +94,9 @@ chunk metadata without object-storage URLs.
 - `POST /search-results/{result_id}/accept`
 - `POST /sources/{source_id}/fetch` requires `Idempotency-Key` and returns `202`; `GET /fetch-jobs/{job_id}` and `/events`
 - `GET /sources/{source_id}/snapshots` and `/snapshots/{snapshot_id}` never return object-storage credentials.
+
+## Phase 5 research jobs
+`POST /projects/{project_id}/research-jobs` requires `Idempotency-Key` and returns `202`; it only
+queues a workflow state and never executes research in the request. Job status, events, brief,
+queries, sources, observations, coverage, gaps and result are available under `/research-jobs/{id}`.
+`cancel`, `resume`, and `retry` are explicit job-control operations and return structured errors with trace IDs.

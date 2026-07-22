@@ -55,3 +55,8 @@ Outputs:
 6. Duplicate detection.
 7. Domain correctness.
 8. Citation check.
+
+## Phase 5 workflow policy
+The LangGraph adapter is behind a framework-independent workflow port. Nodes use versioned
+structured prompts and treat delimited source material as untrusted data; source text cannot invoke
+tools, reveal secrets, import code, change policy, or promote itself to trusted status.
