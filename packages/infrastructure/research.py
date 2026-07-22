@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+import asyncio
+from collections.abc import Awaitable, Callable
 from importlib.util import find_spec
-from typing import Any
+from typing import Any, Protocol
 from uuid import UUID, uuid4
 
 from packages.domain.research import (
@@ -185,6 +187,19 @@ class DeterministicResearchModel:
         )
 
 
+class ResearchSearchExecutor(Protocol):
+    """Executes a planned query and returns IDs of discovered search results."""
+
+    async def execute(self, query: PlannedQuery) -> tuple[UUID, ...]: ...
+
+
+class DeterministicResearchSearchExecutor:
+    """Test search adapter that records a real execution boundary without network I/O."""
+
+    async def execute(self, query: PlannedQuery) -> tuple[UUID, ...]:
+        return (uuid4(),)
+
+
 class InMemoryResearchWorkflow:
     """Deterministic test runner for the application workflow contract, not production LangGraph."""
 
@@ -212,6 +227,7 @@ class InMemoryResearchWorkflow:
         model: ResearchModel | None = None,
         events: InMemoryResearchEventPublisher | None = None,
         artifacts: InMemoryResearchArtifactRepository | None = None,
+        search_executor: ResearchSearchExecutor | None = None,
     ):
         self.jobs, self.checkpoints, self.model, self.events, self.artifacts = (
             jobs,
@@ -220,6 +236,8 @@ class InMemoryResearchWorkflow:
             events or InMemoryResearchEventPublisher(),
             artifacts or InMemoryResearchArtifactRepository(),
         )
+        self.search_executor = search_executor or DeterministicResearchSearchExecutor()
+        self._resume_locks: dict[UUID, asyncio.Lock] = {}
 
     async def start(self, job: ResearchJob, state: ResearchState) -> None:
         await self.checkpoints.save_checkpoint(job.id, "queued", state)
@@ -236,9 +254,68 @@ class InMemoryResearchWorkflow:
 
     async def _checkpoint(self, job: ResearchJob, state: ResearchState, node: str) -> None:
         job.current_node = node
-        job.progress_percent = min(99, (self.nodes.index(node) + 1) * 100 // len(self.nodes))
+        progress_node = node.removeprefix("failed:")
+        job.progress_percent = min(
+            99, (self.nodes.index(progress_node) + 1) * 100 // len(self.nodes)
+        )
         await self.checkpoints.save_checkpoint(job.id, node, state)
         await self.jobs.save(job)
+
+    def _lock_for(self, job_id: UUID) -> asyncio.Lock:
+        """Return the process-local lease used by in-memory worker deliveries."""
+        lock = self._resume_locks.get(job_id)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._resume_locks[job_id] = lock
+        return lock
+
+    async def _model_call(
+        self, job: ResearchJob, state: ResearchState, call: Callable[[], Awaitable[Any]]
+    ) -> Any:
+        """Claim a model-call budget unit before the provider is invoked."""
+        budget = state.budgets
+        if budget.model_calls_used >= budget.model_call_budget:
+            raise ResearchError("RESEARCH_BUDGET_EXHAUSTED", "Model-call budget exhausted")
+        if budget.token_budget is not None and (budget.tokens_used or 0) >= budget.token_budget:
+            raise ResearchError("RESEARCH_BUDGET_EXHAUSTED", "Token budget exhausted")
+        if budget.cost_budget is not None and (budget.estimated_cost or 0) >= budget.cost_budget:
+            raise ResearchError("RESEARCH_BUDGET_EXHAUSTED", "Cost budget exhausted")
+        budget.model_calls_used += 1
+        # state and job normally share this instance, but retain that invariant for
+        # restored checkpoints which may have been deserialized independently.
+        job.budgets.model_calls_used = budget.model_calls_used
+        await self.jobs.save(job)
+        return await call()
+
+    async def _execute_queries(
+        self, state: ResearchState, queries: tuple[PlannedQuery, ...]
+    ) -> None:
+        remaining = max(0, state.budgets.query_budget - state.budgets.queries_used)
+        to_run = queries[:remaining]
+        result_ids: list[UUID] = list(state.search_result_ids)
+        executed = list(state.executed_query_ids)
+        for query in to_run:
+            # An ID only becomes executed after the search adapter has succeeded.
+            result_ids.extend(await self.search_executor.execute(query))
+            executed.append(query.id)
+            state.budgets.queries_used += 1
+        state.search_result_ids = tuple(result_ids)
+        state.executed_query_ids = tuple(executed)
+
+    async def _fail(
+        self, job: ResearchJob, state: ResearchState, node: str, exc: Exception
+    ) -> None:
+        code = exc.code if isinstance(exc, ResearchError) else "RESEARCH_WORKFLOW_FAILED"
+        message = exc.message if isinstance(exc, ResearchError) else str(exc)
+        state.errors = (*state.errors, f"{code}: {message}")
+        job.error_code, job.error_message = code, message
+        if job.status is ResearchStatus.RUNNING:
+            job.transition(ResearchStatus.FAILED)
+        # Do not claim the failed node as complete: retry must re-run it.
+        await self._checkpoint(job, state, f"failed:{node}")
+        await self.events.publish(
+            ResearchEvent("job failed", job.id, message, node, {"code": code})
+        )
 
     async def _cancelled(self, job: ResearchJob) -> bool:
         if not job.cancellation_requested:
@@ -253,6 +330,13 @@ class InMemoryResearchWorkflow:
         return True
 
     async def resume(self, job_id: UUID) -> None:
+        # The lease closes the checkpoint read/claim/write race for concurrent
+        # deliveries in this in-memory adapter. Production stores must provide an
+        # equivalent distributed lease or atomic checkpoint claim.
+        async with self._lock_for(job_id):
+            await self._resume_locked(job_id)
+
+    async def _resume_locked(self, job_id: UUID) -> None:
         job = await self.get_progress(job_id)
         if job.status is ResearchStatus.COMPLETED:
             raise ResearchError("RESEARCH_ALREADY_COMPLETED", "Completed research cannot resume")
@@ -267,68 +351,99 @@ class InMemoryResearchWorkflow:
             if await self._cancelled(job):
                 return
             await self.events.publish(ResearchEvent("phase started", job.id, node, node))
-            if node == "understand_goal":
-                await self.model.understand_goal(state)
-                job.current_phase = ResearchPhase.SCOPING
-            elif node == "create_research_brief":
-                state.research_brief = await self.model.create_research_brief(state)
-                state.research_questions = state.research_brief.required_research_questions
-                job.current_phase = ResearchPhase.PLANNING
-            elif node == "generate_aliases":
-                state.entity_aliases = await self.model.generate_aliases(state.research_brief)  # type: ignore[arg-type]
-            elif node == "plan_queries":
-                candidates = await self.model.plan_queries(state)
-                unique = {q.fingerprint: q for q in candidates}
-                ordered = sorted(unique.values(), key=lambda q: (q.priority, q.fingerprint))
-                remaining = state.budgets.query_budget - state.budgets.queries_used
-                state.planned_queries = tuple(ordered[: max(0, remaining)])
-                job.current_phase = ResearchPhase.DISCOVERING
-            elif node == "execute_searches":
-                state.executed_query_ids = tuple(q.id for q in state.planned_queries)
-                state.budgets.queries_used += len(state.executed_query_ids)
-            elif node == "select_sources":
-                job.current_phase = ResearchPhase.SELECTING
-            elif node == "fetch_sources":
-                job.current_phase = ResearchPhase.FETCHING
-            elif node == "parse_sources":
-                job.current_phase = ResearchPhase.PARSING
-                state.parsed_snapshot_ids = state.fetched_snapshot_ids
-            elif node == "extract_observations":
-                job.current_phase = ResearchPhase.EXTRACTING
-                observations = await self.model.extract_research_observations(state)
-                state.extraction_artifact_ids = tuple(
-                    [
-                        await self.artifacts.save(job.id, "observation", observation)
-                        for observation in observations
-                    ]
-                )
-            elif node == "calculate_coverage":
-                state.coverage = CoverageReport(
-                    1.0 if state.executed_query_ids else 0.0,
-                    0.0,
-                    0.0,
-                    0.0,
-                    len({q.family for q in state.planned_queries}) / 12,
-                    False,
-                    False,
-                    False,
-                    False,
-                    marginal_information_gain=0.0,
-                )
-            elif node == "analyze_gaps":
-                job.current_phase = ResearchPhase.GAP_ANALYSIS
-                state.gaps = await self.model.analyze_gaps(state)
-            elif node == "decide_followup":
-                job.current_phase = ResearchPhase.FOLLOWUP_RESEARCH
-            elif node == "plan_followup_queries":
-                pass
-            elif node == "finalize_research":
-                job.current_phase = ResearchPhase.FINALIZING
-                result = await self.model.assemble_research_result(state)
-                state.final_artifact_id = await self.artifacts.save(
-                    job.id, "research_result", result
-                )
-                job.stop_reason = result.stop_reason
+            try:
+                if node == "understand_goal":
+                    await self._model_call(job, state, lambda: self.model.understand_goal(state))
+                    job.current_phase = ResearchPhase.SCOPING
+                elif node == "create_research_brief":
+                    state.research_brief = await self._model_call(
+                        job, state, lambda: self.model.create_research_brief(state)
+                    )
+                    state.research_questions = state.research_brief.required_research_questions
+                    job.current_phase = ResearchPhase.PLANNING
+                elif node == "generate_aliases":
+                    state.entity_aliases = await self._model_call(
+                        job,
+                        state,
+                        lambda: self.model.generate_aliases(state.research_brief),  # type: ignore[arg-type]
+                    )
+                elif node == "plan_queries":
+                    candidates = await self._model_call(
+                        job, state, lambda: self.model.plan_queries(state)
+                    )
+                    unique = {q.fingerprint: q for q in candidates}
+                    ordered = sorted(unique.values(), key=lambda q: (q.priority, q.fingerprint))
+                    remaining = state.budgets.query_budget - state.budgets.queries_used
+                    state.planned_queries = tuple(ordered[: max(0, remaining)])
+                    job.current_phase = ResearchPhase.DISCOVERING
+                elif node == "execute_searches":
+                    await self._execute_queries(state, state.planned_queries)
+                elif node == "select_sources":
+                    job.current_phase = ResearchPhase.SELECTING
+                elif node == "fetch_sources":
+                    job.current_phase = ResearchPhase.FETCHING
+                elif node == "parse_sources":
+                    job.current_phase = ResearchPhase.PARSING
+                    state.parsed_snapshot_ids = state.fetched_snapshot_ids
+                elif node == "extract_observations":
+                    job.current_phase = ResearchPhase.EXTRACTING
+                    observations = await self._model_call(
+                        job, state, lambda: self.model.extract_research_observations(state)
+                    )
+                    state.extraction_artifact_ids = tuple(
+                        [
+                            await self.artifacts.save(job.id, "observation", observation)
+                            for observation in observations
+                        ]
+                    )
+                elif node == "calculate_coverage":
+                    state.coverage = CoverageReport(
+                        1.0 if state.executed_query_ids else 0.0,
+                        0.0,
+                        0.0,
+                        0.0,
+                        len({q.family for q in state.planned_queries}) / 12,
+                        False,
+                        False,
+                        False,
+                        False,
+                        marginal_information_gain=0.0,
+                    )
+                elif node == "analyze_gaps":
+                    job.current_phase = ResearchPhase.GAP_ANALYSIS
+                    state.gaps = await self._model_call(
+                        job, state, lambda: self.model.analyze_gaps(state)
+                    )
+                elif node == "decide_followup":
+                    job.current_phase = ResearchPhase.FOLLOWUP_RESEARCH
+                elif node == "plan_followup_queries":
+                    if (
+                        state.gaps
+                        and state.current_followup_round < state.budgets.max_followup_rounds
+                    ):
+                        candidates = await self._model_call(
+                            job, state, lambda: self.model.plan_followup_queries(state)
+                        )
+                        known = {query.fingerprint for query in state.planned_queries}
+                        followups = tuple(
+                            query for query in candidates if query.fingerprint not in known
+                        )
+                        state.planned_queries = (*state.planned_queries, *followups)
+                        state.current_followup_round += 1
+                        job.followup_round = state.current_followup_round
+                        await self._execute_queries(state, followups)
+                elif node == "finalize_research":
+                    job.current_phase = ResearchPhase.FINALIZING
+                    result = await self._model_call(
+                        job, state, lambda: self.model.assemble_research_result(state)
+                    )
+                    state.final_artifact_id = await self.artifacts.save(
+                        job.id, "research_result", result
+                    )
+                    job.stop_reason = result.stop_reason
+            except Exception as exc:
+                await self._fail(job, state, node, exc)
+                return
             await self._checkpoint(job, state, node)
             await self.events.publish(ResearchEvent("phase completed", job.id, node, node))
         job.current_phase = ResearchPhase.COMPLETED
