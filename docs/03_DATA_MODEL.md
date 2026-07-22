@@ -133,3 +133,9 @@ Claims retain normalized scope, provenance, validity, status/version and confide
 Evidence links are immutable append-only provenance rows. Confidence assessments and review decisions
 are append-only; source clusters prevent copied sources from inflating corroboration. Skills and
 prerequisites are relational graph records with cycle validation.
+
+## Phase 7 course model
+`CourseGenerationJob` records idempotent, staged draft creation. `CurriculumPlan`, modules,
+lessons, objectives, structured content blocks, immutable citations, and version diffs preserve
+claim/evidence/source provenance. Positions are unique within their parent scope; published versions
+are immutable and rollback clones a historical version into a reviewed draft.

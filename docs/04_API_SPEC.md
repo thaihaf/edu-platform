@@ -105,3 +105,8 @@ queries, sources, observations, coverage, gaps and result are available under `/
 Evidence build is `POST /research-jobs/{job_id}/build-evidence` with `Idempotency-Key`. Claims,
 evidence, contradictions, confidence recalculation and reviews are exposed at `/claims`; review
 history is available at `/review-decisions`. Responses retain the standard typed error and trace-ID contract.
+
+## Phase 7 course generation
+`POST /projects/{project_id}/course-generation-jobs` requires `Idempotency-Key` and returns 202.
+Jobs expose status/events/plan; courses expose draft validation, publication, draft copy, rollback-as-draft,
+modules, lessons, blocks, and citations. Model requests and raw responses are never returned.

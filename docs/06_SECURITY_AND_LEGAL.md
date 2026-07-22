@@ -79,3 +79,7 @@ search/fetch/ingestion services may be used by workflow nodes.
 ## Phase 6 evidence protection
 Observation text, spans and source metadata are untrusted. They are normalized as data and cannot
 mark a source official, set confidence, approve claims, alter clusters, or create unsupported evidence.
+
+## Phase 7 generated content protection
+Course content is structured data, rejects executable HTML, and retains immutable evidence citations.
+Human-authored or locked blocks cannot be overwritten by AI regeneration.

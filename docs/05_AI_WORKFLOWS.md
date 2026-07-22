@@ -65,3 +65,7 @@ tools, reveal secrets, import code, change policy, or promote itself to trusted 
 Optional normalization/classification models provide structured suggestions only. Deterministic
 fingerprint, independence, confidence and verification policies remain authoritative and retain
 prompt/schema metadata without exposing raw model output.
+
+## Phase 7 course policy
+Course prompts use versioned typed schemas. Only approved Phase 6 claims, skills and evidence may
+inform drafts; untrusted source text cannot determine publication, confidence, locks, or citations.

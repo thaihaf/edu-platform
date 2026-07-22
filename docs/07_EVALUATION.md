@@ -64,3 +64,7 @@ Each case includes:
 Evaluate claim fingerprint stability, independence-aware corroboration, contradiction scope matching,
 direct reported-question provenance, confidence component reproducibility, review auditability, and
 acyclic skill relationships.
+
+## Phase 7 quality gates
+A draft must have cited factual blocks, objectives for every lesson, resolvable prerequisites, unique
+positions, approved claim/skill linkage, and no executable content before publication.
