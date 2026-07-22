@@ -1,0 +1,61 @@
+# Evaluation Plan
+
+## Research metrics
+
+- source_relevance
+- source_diversity
+- source_authority
+- temporal_coverage
+- evidence_directness
+- corroboration
+- contradiction_handling
+- citation_correctness
+- claim_groundedness
+- research_completeness
+
+## Course metrics
+
+- objective_coverage
+- prerequisite_consistency
+- lesson_coherence
+- source_coverage
+- redundancy
+- difficulty_progression
+- domain_alignment
+
+## Question metrics
+
+- factual_correctness
+- single_best_answer
+- distractor_quality
+- ambiguity
+- bloom_alignment
+- difficulty
+- grounding
+- duplicate_similarity
+- language_quality
+
+## Quality gates
+
+A question cannot be published when:
+
+- no answer,
+- unsupported factual answer,
+- unresolved reviewer disagreement,
+- similarity > 0.92 with an existing question unless marked duplicate,
+- origin type reported without evidence,
+- citation missing for source-derived claims.
+
+## Golden datasets
+
+Create:
+- `evals/agribank/research_cases.jsonl`
+- `evals/agribank/questions.jsonl`
+- `evals/general/course_generation.jsonl`
+
+Each case includes:
+- input
+- expected facts
+- required sources
+- forbidden claims
+- rubric

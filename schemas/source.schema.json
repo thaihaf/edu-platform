@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Source",
+  "type": "object",
+  "required": [
+    "url",
+    "title",
+    "source_type"
+  ],
+  "properties": {
+    "url": {
+      "type": "string"
+    },
+    "title": {
+      "type": "string"
+    },
+    "source_type": {
+      "enum": [
+        "official",
+        "candidate_review",
+        "training_provider",
+        "news",
+        "blog",
+        "forum",
+        "document",
+        "video",
+        "other"
+      ]
+    },
+    "publisher": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "published_at": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "authority_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "directness_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "freshness_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "commercial_bias_score": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  }
+}

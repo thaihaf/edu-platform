@@ -1,0 +1,83 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Question",
+  "type": "object",
+  "required": [
+    "type",
+    "stem",
+    "answer",
+    "explanation",
+    "origin_type",
+    "source_ids"
+  ],
+  "properties": {
+    "type": {
+      "enum": [
+        "single_choice",
+        "multiple_choice",
+        "true_false",
+        "short_answer",
+        "essay",
+        "coding",
+        "sql",
+        "scenario",
+        "system_design",
+        "interview"
+      ]
+    },
+    "stem": {
+      "type": "string",
+      "minLength": 10
+    },
+    "options": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "answer": {},
+    "explanation": {
+      "type": "string"
+    },
+    "difficulty": {
+      "enum": [
+        "easy",
+        "medium",
+        "hard",
+        "expert"
+      ]
+    },
+    "bloom_level": {
+      "enum": [
+        "remember",
+        "understand",
+        "apply",
+        "analyze",
+        "evaluate",
+        "create"
+      ]
+    },
+    "origin_type": {
+      "enum": [
+        "VERBATIM_REPORTED",
+        "PARAPHRASED_REPORTED",
+        "SOURCE_DERIVED",
+        "JD_INFERRED",
+        "DOMAIN_STANDARD",
+        "AI_SYNTHESIZED"
+      ]
+    },
+    "source_ids": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    }
+  },
+  "additionalProperties": false
+}

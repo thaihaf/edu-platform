@@ -1,0 +1,63 @@
+domain: banking_software_recruitment
+locale: vi-VN
+goal: "Ôn thi và phỏng vấn Chuyên viên phát triển phần mềm Agribank"
+entities:
+  organization:
+    name: Agribank
+    aliases:
+      - Ngân hàng Nông nghiệp và Phát triển Nông thôn Việt Nam
+      - Trung tâm Công nghệ thông tin Agribank
+  role:
+    name: Chuyên viên phát triển phần mềm
+    aliases:
+      - CNTT-02
+      - Chuyên viên CNTT
+      - IT Agribank
+time_range:
+  from: 2023
+  to: 2026
+required_source_types:
+  - official_recruitment
+  - official_technology_news
+  - candidate_exam_review
+  - candidate_interview_review
+  - training_provider_review
+  - shared_exam_document
+research_topics:
+  - quy trình tuyển dụng
+  - cấu trúc đề
+  - dạng câu hỏi
+  - câu hỏi được báo cáo thực tế
+  - Java
+  - C
+  - Web
+  - SQL
+  - PL/SQL
+  - cơ sở dữ liệu
+  - hệ điều hành
+  - mạng máy tính
+  - API
+  - ESB
+  - microservices
+  - core banking
+  - thanh toán điện tử
+  - bảo mật
+  - vận hành production
+  - nghiệp vụ ngân hàng cho IT
+research:
+  depth: deep
+  max_queries: 120
+  max_sources: 250
+  max_followup_rounds: 5
+  require_contradiction_search: true
+assessment:
+  min_questions: 400
+  types:
+    - single_choice
+    - multiple_choice
+    - short_answer
+    - coding
+    - sql
+    - scenario
+    - system_design
+    - interview

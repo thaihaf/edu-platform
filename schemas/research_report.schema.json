@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ResearchPlan",
+  "type": "object",
+  "required": [
+    "goal",
+    "research_questions",
+    "query_families",
+    "required_source_types",
+    "stop_criteria"
+  ],
+  "properties": {
+    "goal": {
+      "type": "string"
+    },
+    "entities": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "research_questions": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "query_families": {
+      "type": "array",
+      "items": {
+        "type": "object"
+      }
+    },
+    "required_source_types": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "contradiction_queries": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "stop_criteria": {
+      "type": "object"
+    }
+  },
+  "additionalProperties": false
+}

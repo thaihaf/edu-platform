@@ -1,0 +1,23 @@
+domain: generic
+locale: vi-VN
+research:
+  depth: medium
+  max_queries: 60
+  max_sources: 100
+  max_followup_rounds: 3
+  prefer_official_sources: true
+  require_contradiction_search: true
+  include_candidate_reports: true
+assessment:
+  types:
+    - single_choice
+    - short_answer
+    - scenario
+    - interview
+  min_questions: 100
+  require_citations: true
+  reported_question_requires_evidence: true
+quality:
+  min_claim_groundedness: 0.85
+  min_citation_coverage: 1.0
+  max_duplicate_similarity: 0.92
