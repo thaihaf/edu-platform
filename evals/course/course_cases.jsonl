@@ -1,0 +1,2 @@
+{"case_key":"cited-lesson","artifact_type":"COURSE_VERSION","input":{"factual_blocks":[{"text":"Fact","citation":"source"}],"prerequisites_valid":true,"immutable":true},"rubric":{"citations":"all factual blocks cited"}}
+{"case_key":"uncited-fact","artifact_type":"CONTENT_BLOCK","input":{"factual_blocks":[{"text":"Fact"}]},"rubric":{"citations":"must fail"}}

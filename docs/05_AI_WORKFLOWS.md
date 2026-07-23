@@ -69,3 +69,7 @@ prompt/schema metadata without exposing raw model output.
 ## Phase 7 course policy
 Course prompts use versioned typed schemas. Only approved Phase 6 claims, skills and evidence may
 inform drafts; untrusted source text cannot determine publication, confidence, locks, or citations.
+
+## Phase 9 evaluation policy
+Deterministic metrics run before optional model-assisted metrics. Judge inputs are typed and delimited;
+untrusted artifact/source text is data, never instructions. Deterministic safety gates retain final authority.

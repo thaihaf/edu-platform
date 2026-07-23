@@ -83,3 +83,7 @@ mark a source official, set confidence, approve claims, alter clusters, or creat
 ## Phase 7 generated content protection
 Course content is structured data, rejects executable HTML, and retains immutable evidence citations.
 Human-authored or locked blocks cannot be overwritten by AI regeneration.
+
+## Phase 9 evaluation safety
+Evaluation never sends secrets, credentials, tools, or raw vendor prompts to a judge. Injection-like source
+text is preserved as evidence but cannot change a metric, gate, or publication decision.

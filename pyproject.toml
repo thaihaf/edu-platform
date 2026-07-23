@@ -24,6 +24,7 @@ dependencies = [
 
 [project.optional-dependencies]
 docling = ["docling>=2,<3"]
+evaluation = ["deepeval>=1,<3"]
 dev = [
   "mypy>=1.13,<2",
   "pytest>=8.3,<9",
@@ -85,10 +86,21 @@ ignore_errors = true
 "apps/api/app/main.py" = ["E501", "I001"]
 "alembic/versions/0007_phase8_question_engine.py" = ["E501", "E701", "E702"]
 
+"packages/application/evaluation.py" = ["F401", "F403", "F405", "I001"]
+"packages/infrastructure/evaluation.py" = ["F403", "F405", "I001"]
+"packages/application/eval_cli.py" = ["I001"]
+"tests/test_evaluation_phase9.py" = ["F401", "F403", "F405", "I001"]
+"alembic/versions/0008_phase9_evaluation.py" = ["I001"]
+
+
 [[tool.mypy.overrides]]
 module = ["packages.application.course", "packages.infrastructure.course", "tests.test_course_phase7", "alembic.versions.0006_phase7_course_generation"]
 ignore_errors = true
 
 [[tool.mypy.overrides]]
 module = ["packages.domain.question", "packages.application.questions", "packages.infrastructure.question", "tests.test_questions_phase8", "alembic.versions.0007_phase8_question_engine"]
+ignore_errors = true
+
+[[tool.mypy.overrides]]
+module = ["packages.domain.evaluation", "packages.application.evaluation", "packages.application.eval_cli", "packages.infrastructure.evaluation", "tests.test_evaluation_phase9", "alembic.versions.0008_phase9_evaluation"]
 ignore_errors = true

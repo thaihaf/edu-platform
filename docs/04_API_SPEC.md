@@ -118,3 +118,8 @@ history is available at `/review-decisions`. Responses retain the standard typed
 `POST /projects/{project_id}/course-generation-jobs` requires `Idempotency-Key` and returns 202.
 Jobs expose status/events/plan; courses expose draft validation, publication, draft copy, rollback-as-draft,
 modules, lessons, blocks, and citations. Model requests and raw responses are never returned.
+
+## Phase 9 evaluation
+Evaluation-run creation requires `Idempotency-Key` and returns `202`; run reads expose only typed run,
+result, aggregate, gate, event and regression records. Dataset and policy versions are validated before
+publication. Raw model prompts, credentials and vendor response bodies are never returned.

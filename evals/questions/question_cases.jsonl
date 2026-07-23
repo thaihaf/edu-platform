@@ -1,0 +1,4 @@
+{"case_key":"valid-single-choice","artifact_type":"QUESTION","input":{"options":[{"is_correct":true},{"is_correct":false}],"evidence":["span"],"unambiguous":true,"eligible":true},"rubric":{"answer":"one answer"}}
+{"case_key":"two-correct","artifact_type":"QUESTION","input":{"options":[{"is_correct":true},{"is_correct":true}]},"rubric":{"answer":"must fail"}}
+{"case_key":"reported-without-evidence","artifact_type":"QUESTION","input":{"reported_origin":true,"evidence":[]},"rubric":{"provenance":"must fail"}}
+{"case_key":"empty-non-choice","artifact_type":"QUESTION","input":{"answer":"","rubric":""},"rubric":{"answer":"must fail"}}
