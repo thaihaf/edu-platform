@@ -782,16 +782,48 @@ class QuestionGenerationIn(BaseModel):
 
 
 def _question_error(request: Request, exc: QuestionError) -> JSONResponse:
-    return JSONResponse(status_code=404 if exc.code.endswith("NOT_FOUND") else 409 if exc.code in {"IDEMPOTENCY_CONFLICT", "QUESTION_BANK_VERSION_IMMUTABLE"} else 422, content={"error": {"code": exc.code, "message": exc.message, "details": {}, "trace_id": request.headers.get("X-Trace-ID", "")}})
+    return JSONResponse(
+        status_code=404
+        if exc.code.endswith("NOT_FOUND")
+        else 409
+        if exc.code in {"IDEMPOTENCY_CONFLICT", "QUESTION_BANK_VERSION_IMMUTABLE"}
+        else 422,
+        content={
+            "error": {
+                "code": exc.code,
+                "message": exc.message,
+                "details": {},
+                "trace_id": request.headers.get("X-Trace-ID", ""),
+            }
+        },
+    )
 
 
 @app.post("/api/v1/projects/{project_id}/question-generation-jobs", status_code=202)
-async def start_question_generation(project_id: UUID, body: QuestionGenerationIn, request: Request) -> Any:
+async def start_question_generation(
+    project_id: UUID, body: QuestionGenerationIn, request: Request
+) -> Any:
     key = request.headers.get("Idempotency-Key")
     if not key:
-        return _question_error(request, QuestionError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required"))
+        return _question_error(
+            request, QuestionError("IDEMPOTENCY_CONFLICT", "Idempotency-Key is required")
+        )
     data = body.model_dump()
-    job = QuestionGenerationJob(project_id, key, tuple(data["requested_question_types"]), data["requested_count"], data["created_by"], course_id=data["course_id"], course_version_id=data["course_version_id"], module_id=data["module_id"], lesson_id=data["lesson_id"], difficulty_distribution=data["difficulty_distribution"], bloom_distribution=data["bloom_distribution"], origin_policy=data["origin_policy"], request_fingerprint=question_fingerprint(data))
+    job = QuestionGenerationJob(
+        project_id,
+        key,
+        tuple(data["requested_question_types"]),
+        data["requested_count"],
+        data["created_by"],
+        course_id=data["course_id"],
+        course_version_id=data["course_version_id"],
+        module_id=data["module_id"],
+        lesson_id=data["lesson_id"],
+        difficulty_distribution=data["difficulty_distribution"],
+        bloom_distribution=data["bloom_distribution"],
+        origin_policy=data["origin_policy"],
+        request_fingerprint=question_fingerprint(data),
+    )
     try:
         return await QuestionService(_question_repository).start(job)
     except QuestionError as exc:
@@ -801,7 +833,14 @@ async def start_question_generation(project_id: UUID, body: QuestionGenerationIn
 @app.get("/api/v1/question-generation-jobs/{job_id}")
 async def get_question_generation(job_id: UUID, request: Request) -> Any:
     job = await _question_repository.get_job(job_id)
-    return job if job else _question_error(request, QuestionError("QUESTION_GENERATION_JOB_NOT_FOUND", "Question generation job not found"))
+    return (
+        job
+        if job
+        else _question_error(
+            request,
+            QuestionError("QUESTION_GENERATION_JOB_NOT_FOUND", "Question generation job not found"),
+        )
+    )
 
 
 @app.get("/api/v1/question-generation-jobs/{job_id}/events")
