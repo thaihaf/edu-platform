@@ -5,3 +5,30 @@
 .ruff_cache/
 __pycache__/
 *.py[cod]
+
+# Root-level JavaScript build and test artifacts
+/node_modules
+/.next
+/coverage
+/playwright-report
+/test-results
+/*.tsbuildinfo
+
+# Frontend dependencies, build outputs, and verification artifacts
+/apps/web/node_modules
+/apps/web/.next
+/apps/web/out
+/apps/web/coverage
+/apps/web/playwright-report
+/apps/web/test-results
+/apps/web/.vitest
+/apps/web/.turbo
+/apps/web/.eslintcache
+/apps/web/*.tsbuildinfo
+
+# Frontend local environment overrides (keep .env.example tracked)
+/apps/web/.env
+/apps/web/.env.local
+/apps/web/.env.development.local
+/apps/web/.env.test.local
+/apps/web/.env.production.local
