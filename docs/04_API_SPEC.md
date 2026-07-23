@@ -123,3 +123,11 @@ modules, lessons, blocks, and citations. Model requests and raw responses are ne
 Evaluation-run creation requires `Idempotency-Key` and returns `202`; run reads expose only typed run,
 result, aggregate, gate, event and regression records. Dataset and policy versions are validated before
 publication. Raw model prompts, credentials and vendor response bodies are never returned.
+
+## Phase 10 admin-web consumption
+
+The admin web consumes existing `/api/v1` routes as the authoritative source of records and
+business policy. It sends `X-Trace-ID`, uses `Idempotency-Key` for asynchronous ingestion,
+research, course, question, and evaluation starts, and renders the standard error envelope.
+Dashboard aggregates and several administrative list/detail actions require additional read-only
+API contracts for efficient production use; the browser does not recreate those policies.

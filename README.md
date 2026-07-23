@@ -121,3 +121,15 @@ extras and run `pytest -m "not integration and not e2e"`. The in-memory workflow
 is a test adapter only; production research requires a worker, LangGraph, PostgreSQL
 checkpoint storage, and the configured search/fetch/model providers. See
 `docs/deferred-verification.md` for the commands that need that environment.
+
+## Administrative web (Phase 10)
+
+The administrator studio lives in `apps/web`. Copy `apps/web/.env.example` to a local `.env.local`,
+then use `make web-dev`. The app calls FastAPI at `NEXT_PUBLIC_API_BASE_URL`; mock identity is the
+default development boundary and never grants backend authorization. The standard web commands are
+`make web-lint`, `make web-typecheck`, `make web-test`, `make web-build`, and `make web-e2e-mock`.
+
+The package registry was unavailable while this phase was prepared, so a generated lockfile and
+runtime frontend verification remain deferred. The manifest declares the intended dependencies;
+run `npm install` in `apps/web` in an approved environment to generate and commit the lockfile
+before enabling the web CI job. See `docs/deferred-verification.md`.
