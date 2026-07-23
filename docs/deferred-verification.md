@@ -47,3 +47,15 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | Redis/Celery evaluation dispatch and API-to-worker flow | Docker unavailable | e2e | run Compose evaluation worker suite |
 | Real DeepEval runtime and external judge models | optional dependency/credentials unavailable | integration | configure providers and run contract suite |
 | Large-dataset performance and token/cost accounting | worker/model infrastructure unavailable | integration | run benchmark with configured provider |
+
+## Phase 10 administrative web
+
+| Check | Reason deferred | Category | Command / required infrastructure |
+|---|---|---|---|
+| Frontend dependency lockfile and install | package index returned HTTP 403 in this environment | build | `cd apps/web && npm install` in an approved registry environment, then commit `package-lock.json` |
+| Live FastAPI integration | no persistent API process/data fixtures available | integration | run API and `NEXT_PUBLIC_MOCK_MODE=false npm run dev` |
+| Production authentication adapter | identity provider/session host not selected | integration | configure host bearer/session adapter and authorization contract tests |
+| Live file upload | object storage and upload endpoint unavailable | integration | run source-file ingestion against configured object storage |
+| Live SSE/event streaming | worker/event broker unavailable | integration | run research/generation jobs with worker and SSE endpoint |
+| Mocked browser smoke | Playwright dependencies cannot be installed without package registry | e2e | `make web-e2e-mock` after `make web-install` |
+| Deployment production build | frontend dependencies unavailable locally | build | `make web-build` in CI/deployment environment |

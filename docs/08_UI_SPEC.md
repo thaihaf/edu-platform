@@ -69,3 +69,19 @@ Display:
 - Flashcards
 - Mock interview
 - Weak-skill analytics
+
+## Phase 10 administrative studio
+
+The desktop-first administrative studio has a persistent sidebar for Dashboard, Projects, Sources,
+Research, Evidence, Knowledge, Courses, Question Banks, Evaluation, and Settings. Its header
+contains workspace/project selection, breadcrumbs, command-palette placeholder, environment,
+health, deferred-verification, and current-user indicators. Every API-backed panel must provide
+loading, empty, denied, not-found, and safe retry states; error details expose backend code and
+trace ID without a stack trace.
+
+All mutations use backend contracts and idempotency keys where applicable. Published course,
+question-bank, dataset, and policy versions are visibly read-only. Source and Markdown content is
+rendered as text/sanitized Markdown only; untrusted HTML is never injected. Forms have labels,
+error summaries, keyboard focus, confirmation for state-changing actions, and textual status in
+addition to visual styling. The phase scaffold provides the shell and primary context pages; live
+endpoint completeness is deferred until the API exposes list/detail contracts consistently.

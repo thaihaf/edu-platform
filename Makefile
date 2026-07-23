@@ -33,3 +33,19 @@ eval-smoke:
 	python -m packages.application.eval_cli
 
 eval-regression: eval-smoke
+
+.PHONY: web-install web-dev web-lint web-typecheck web-test web-build web-e2e-mock
+web-install:
+	npm --prefix apps/web ci
+web-dev:
+	npm --prefix apps/web run dev
+web-lint:
+	npm --prefix apps/web run lint
+web-typecheck:
+	npm --prefix apps/web run typecheck
+web-test:
+	npm --prefix apps/web run test
+web-build:
+	npm --prefix apps/web run build
+web-e2e-mock:
+	npm --prefix apps/web run e2e:mock

@@ -50,3 +50,11 @@ All notable changes to this project are documented in this file.
 
 ## Phase 9 — Evaluation
 - Added provider-neutral deterministic evaluation, metric registry, quality gates, golden fixtures, baseline comparison, optional DeepEval boundary, and CI-safe smoke commands.
+
+## Phase 10 — Admin web
+
+- Added the Next.js administrative research and course studio scaffold, typed API transport,
+  authentication boundary, accessible application shell, bounded-context routes, project wizard,
+  common error/loading/empty/status primitives, and deterministic test specifications.
+- Documented the frontend architecture, API/source-of-truth boundary, security/accessibility
+  approach, environment configuration, mock strategy, and deferred live verification.
