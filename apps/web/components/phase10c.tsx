@@ -61,6 +61,7 @@ export function QualityGateStatus({ value }: { value: string }) {
 }
 export function RegressionDelta({
   value,
+  compatible,
 }: {
   value: number;
   compatible?: boolean;
@@ -427,28 +428,38 @@ export function CourseGenerationDetail({ jobId }: { jobId: string }) {
   if (q.isLoading) return <LoadingSkeleton />;
   if (q.isError)
     return <ErrorState error={q.error} retry={() => q.refetch()} />;
-  const j = q.data;
+  if (!q.data) {
+    return (
+      <ErrorState
+        error={new Error("Course generation job was not found.")}
+        retry={() => q.refetch()}
+      />
+    );
+  }
+  const job: CourseGenerationJob = q.data;
   return (
     <section className="space-y-4 rounded border bg-white p-5">
       <h2 className="text-xl font-bold">Course generation job</h2>
-      <StatusBadge value={j.status} />
+      <StatusBadge value={job.status} />
       <p>
-        Stage: {j.current_stage}; progress: {j.progress_percent}%.
+        Stage: {job.current_stage}; progress: {job.progress_percent}%.
       </p>
       <p>
-        Outcome: {j.target_outcome}; audience: {j.target_audience}; locale:{" "}
-        {j.locale}.
+        Outcome: {job.target_outcome}; audience: {job.target_audience}; locale:{" "}
+        {job.locale}.
       </p>
       <p>
-        Policy: {j.policy_version}; prompt version: {j.prompt_version}.
+        Policy: {job.policy_version}; prompt version: {job.prompt_version}.
         Model/token budget details are not returned by this API contract.
       </p>
-      {j.error_message && (
-        <ErrorState error={new Error(`${j.error_code}: ${j.error_message}`)} />
+      {job.error_message && (
+        <ErrorState
+          error={new Error(`${job.error_code}: ${job.error_message}`)}
+        />
       )}
       <Events events={e.data} />
-      {j.course_id ? (
-        <Link className="underline" href={`/courses/${j.course_id}`}>
+      {job.course_id ? (
+        <Link className="underline" href={`/courses/${job.course_id}`}>
           Open generated draft
         </Link>
       ) : (
@@ -478,24 +489,34 @@ export function QuestionGenerationDetail({ jobId }: { jobId: string }) {
   if (q.isLoading) return <LoadingSkeleton />;
   if (q.isError)
     return <ErrorState error={q.error} retry={() => q.refetch()} />;
-  const j = q.data;
+  if (!q.data) {
+    return (
+      <ErrorState
+        error={new Error("Question generation job was not found.")}
+        retry={() => q.refetch()}
+      />
+    );
+  }
+  const job: QuestionGenerationJob = q.data;
   return (
     <section className="space-y-4 rounded border bg-white p-5">
       <h2 className="text-xl font-bold">Question generation job</h2>
-      <StatusBadge value={j.status} />
+      <StatusBadge value={job.status} />
       <p>
-        Stage: {j.current_stage}; progress: {j.progress_percent}%.
+        Stage: {job.current_stage}; progress: {job.progress_percent}%.
       </p>
       <p>
-        Requested: {j.requested_count}; generated: {j.generated_count};
-        accepted: {j.accepted_count}; rejected: {j.rejected_count}.
+        Requested: {job.requested_count}; generated: {job.generated_count};
+        accepted: {job.accepted_count}; rejected: {job.rejected_count}.
       </p>
       <p>
-        Types: {j.requested_question_types.join(", ")}. Model calls:{" "}
-        {j.model_calls_used}; tokens: {j.tokens_used ?? "not reported"}.
+        Types: {job.requested_question_types.join(", ")}. Model calls:{" "}
+        {job.model_calls_used}; tokens: {job.tokens_used ?? "not reported"}.
       </p>
-      {j.error_message && (
-        <ErrorState error={new Error(`${j.error_code}: ${j.error_message}`)} />
+      {job.error_message && (
+        <ErrorState
+          error={new Error(`${job.error_code}: ${job.error_message}`)}
+        />
       )}
       <Events events={e.data} />
     </section>

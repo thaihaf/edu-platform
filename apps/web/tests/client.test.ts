@@ -25,7 +25,7 @@ describe("typed API client", () => {
   });
   it("sends an idempotency key for mutation", async () => {
     const fetchMock = vi
-      .fn()
+      .fn<typeof fetch>()
       .mockResolvedValue(
         new Response(JSON.stringify({ id: "1" }), { status: 202 }),
       );
@@ -35,8 +35,7 @@ describe("typed API client", () => {
       body: { goal: "x" },
       idempotencyKey: "key-1",
     });
-    expect(fetchMock.mock.calls[0][1].headers.get("Idempotency-Key")).toBe(
-      "key-1",
-    );
+    const request = fetchMock.mock.calls[0]?.[1];
+    expect(new Headers(request?.headers).get("Idempotency-Key")).toBe("key-1");
   });
 });
