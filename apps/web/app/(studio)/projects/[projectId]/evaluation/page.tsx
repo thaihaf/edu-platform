@@ -4,11 +4,11 @@ export default function Page() {
   return (
     <AdminPage
       title="Evaluation"
-      description="Evaluation metrics, gates, and regressions are backend-authoritative."
+      description="Evaluation runs and quality decisions are backend-authoritative."
     >
       <Phase10CUnavailable
-        feature="Cross-project evaluation dashboard"
-        endpoint="GET /evaluation-runs (paginated)"
+        feature="Evaluation-run list and start evaluation"
+        endpoint="GET/POST /projects/{project_id}/evaluation-runs"
       />
     </AdminPage>
   );

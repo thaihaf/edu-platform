@@ -96,3 +96,29 @@ Research polling stops on terminal statuses. Where the backend lacks a paginated
 contract, the route visibly reports that the feature is unavailable rather than showing invented
 records. Tables retain semantic headers and responsive overflow; source content is rendered as
 safe text. Severity, status, and lineage caution use written labels, not color alone.
+
+## Phase 10C course, question, and evaluation administration
+
+Phase 10C adds project-scoped course and question-generation forms plus supported generation-job
+inspection. They use typed asynchronous FastAPI contracts, idempotency keys, textual statuses, and
+bounded polling that stops at terminal states or while the document is hidden. The course and
+question-bank/evaluation routes required by the admin information architecture are present. When
+FastAPI does not expose a documented contract, a route presents an accessible availability notice
+with the exact required endpoint instead of mocked records, fake publication success, or browser
+policy.
+
+Course-editor, question-review, versioning, validation/publication, datasets, policies, baselines,
+and evaluation-results pages retain their required safe design: published versions are immutable;
+content blocks, JSON, code, and diagram specifications are treated as text; confidence, origin,
+and gate values have written labels; citations must not expose storage URLs; and destructive
+transitions require backend-supported confirmation. The missing endpoints are listed in the Phase
+10C note and frontend API limitations.
+
+### Accessibility and security notes
+
+Generation forms have associated labels, visible error summaries, disabled duplicate submits, and
+recoverable input retention. Job events use semantic headings and textual status. Untrusted text is
+not inserted as HTML; JSON validation parses but never evaluates values. External citation
+navigation will be limited to safe links with `rel="noopener noreferrer"` once citation records are
+available. No provider credentials, raw prompts, storage paths, or hidden answer metadata are
+placed in browser state.

@@ -1,12 +1,15 @@
 import { AdminPage } from "@/components/page";
-import { StatusBadge } from "@/components/primitives";
+import { Phase10CUnavailable } from "@/components/phase10c";
 export default function Page() {
   return (
     <AdminPage
       title="Courses"
-      description="Generate cited drafts, edit only drafts, inspect citations, validate, diff, publish, or clone versions."
+      description="Select a project to start generation or manage API-backed course records."
     >
-      <StatusBadge value="API is authoritative" />
+      <Phase10CUnavailable
+        feature="Cross-project course list"
+        endpoint="GET /courses (paginated)"
+      />
     </AdminPage>
   );
 }

@@ -65,3 +65,12 @@ All notable changes to this project are documented in this file.
   bounded research-job polling/actions, and claim-review UI with structured API errors.
 - Added explicit non-mocking availability states for missing paginated administrative API reads.
 - Documented API, security, accessibility, mock-fixture, and verification limits for this phase.
+
+## Phase 10C — Course, question, and evaluation administration
+
+- Added typed, idempotent course and question generation forms and terminal-aware job polling.
+- Added the Phase 10C route inventory and safe API-unavailable states for course editor/version,
+  question review/version, evaluation, golden dataset, quality-gate policy, and baseline contracts
+  that the current FastAPI application does not yet expose.
+- Added reusable textual confidence/origin/gate/regression, immutable-version, protected-content,
+  citation, and JSON-safety admin primitives plus Phase 10C API-limit and UX documentation.

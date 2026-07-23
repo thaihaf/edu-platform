@@ -3,12 +3,12 @@ import { Phase10CUnavailable } from "@/components/phase10c";
 export default function Page() {
   return (
     <AdminPage
-      title="Question Banks"
-      description="Select a project to generate or review question-bank drafts."
+      title="Evaluation baselines"
+      description="This administrative view does not invent production records or policy outcomes."
     >
       <Phase10CUnavailable
-        feature="Cross-project question-bank list"
-        endpoint="GET /question-banks (paginated)"
+        feature="Evaluation baselines"
+        endpoint="GET /evaluation-baselines (paginated)"
       />
     </AdminPage>
   );
