@@ -77,8 +77,11 @@ All notable changes to this project are documented in this file.
 
 ## Phase 10 — Frontend verification
 
-- Added the Phase 10 frontend verification plan and documented npm as the sole package manager.
-- Recorded the exact registry blocker: npm received HTTP 403 fetching `@hookform/resolvers`, so
-  no lockfile or runtime frontend checks were claimed as verified.
-- Recorded static dependency, safe-rendering, browser-storage, and API-contract-limit observations
-  without substituting them for unavailable runtime checks.
+- Added the Phase 10 frontend CI workflow design: Node.js 22, frozen npm installation, formatting,
+  lint, strict typecheck, unit/component tests, production build, and a separate mocked Chromium
+  smoke job with failure artifacts.
+- Normalized the frontend format-check and ESLint commands and configured Playwright failure traces
+  and screenshots for the mocked smoke suite.
+- The official npm registry remains unavailable in this execution environment (HTTP 403 for
+  `@hookform/resolvers`), so `apps/web/package-lock.json` could not be generated or committed and
+  no runtime frontend check is claimed as verified until the approved CI environment generates it.

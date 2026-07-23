@@ -94,3 +94,15 @@ clusters; evaluation runs/results; golden datasets; quality-gate policies; and b
 10C renders typed unavailable states for these capabilities rather than emulating successful
 production behavior. `apps/web/tests/mocks` remains the only location for deterministic mock
 fixtures; production routes do not consume them.
+
+## Phase 10 frontend CI verification
+
+| Check/category | Reason | Type | Later execution |
+|---|---|---|---|
+| Authoritative `apps/web/package-lock.json` generation and frozen frontend CI | This execution environment receives HTTP 403 from the official npm registry for `@hookform/resolvers`; manually fabricating a lockfile is prohibited | dependency / CI | In an approved GitHub Actions runner, run `npm --prefix apps/web install` once, commit the generated lockfile, then let `.github/workflows/frontend.yml` run `npm ci` and all frontend jobs |
+| Live FastAPI integration, production authentication, file upload, and SSE | The CI smoke suite deliberately uses mock-only public configuration and no service infrastructure | integration | Run against explicitly provisioned API, identity, object storage, worker, and event infrastructure without exposing secrets in `NEXT_PUBLIC_*` values |
+
+The frontend workflow is configured but must not be reported as successful until the committed
+npm-generated lockfile allows the frozen install and its jobs to run. Its mocked browser job is
+separate (not deferred) and will install Chromium, run without Docker or a backend, and upload
+reports, screenshots, and traces on failure.
