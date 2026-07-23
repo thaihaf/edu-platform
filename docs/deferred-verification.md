@@ -2,17 +2,17 @@
 
 Docker is unavailable in this execution environment, so no Docker command was run or installed.
 
-| Check/category | Reason | Type | Later execution |
-|---|---|---|---|
-| `docker compose config` runtime validation | Docker unavailable | environmental | `docker compose config` in a Docker-enabled runner |
-| PostgreSQL repository integration tests (`integration`) | no PostgreSQL service | environmental | `pytest -m integration` against Compose PostgreSQL |
-| Alembic upgrade/downgrade on PostgreSQL | no PostgreSQL service | environmental | `alembic upgrade head && alembic downgrade base` |
-| Redis readiness and Celery broker ping | Docker unavailable | environmental | run Compose then health/worker checks |
-| MinIO and SearXNG connectivity | Docker unavailable | environmental | run Compose service probes |
-| MinIO source-object upload integration | Docker unavailable | environmental | exercise S3-compatible adapter against Compose MinIO |
-| PostgreSQL source-chunk persistence and pgvector extension/dimension behavior | no PostgreSQL service | environmental | run `pytest -m integration` against pgvector PostgreSQL |
-| Docling PDF/DOCX real-file conversion | optional Docling dependency/integration fixtures unavailable | environmental | install `.[docling]` and run parser integration tests |
-| Celery/Redis ingestion execution and API-to-worker end-to-end ingestion | Docker unavailable | environmental | run Compose worker and e2e suite |
+| Check/category                                                                | Reason                                                       | Type          | Later execution                                         |
+| ----------------------------------------------------------------------------- | ------------------------------------------------------------ | ------------- | ------------------------------------------------------- |
+| `docker compose config` runtime validation                                    | Docker unavailable                                           | environmental | `docker compose config` in a Docker-enabled runner      |
+| PostgreSQL repository integration tests (`integration`)                       | no PostgreSQL service                                        | environmental | `pytest -m integration` against Compose PostgreSQL      |
+| Alembic upgrade/downgrade on PostgreSQL                                       | no PostgreSQL service                                        | environmental | `alembic upgrade head && alembic downgrade base`        |
+| Redis readiness and Celery broker ping                                        | Docker unavailable                                           | environmental | run Compose then health/worker checks                   |
+| MinIO and SearXNG connectivity                                                | Docker unavailable                                           | environmental | run Compose service probes                              |
+| MinIO source-object upload integration                                        | Docker unavailable                                           | environmental | exercise S3-compatible adapter against Compose MinIO    |
+| PostgreSQL source-chunk persistence and pgvector extension/dimension behavior | no PostgreSQL service                                        | environmental | run `pytest -m integration` against pgvector PostgreSQL |
+| Docling PDF/DOCX real-file conversion                                         | optional Docling dependency/integration fixtures unavailable | environmental | install `.[docling]` and run parser integration tests   |
+| Celery/Redis ingestion execution and API-to-worker end-to-end ingestion       | Docker unavailable                                           | environmental | run Compose worker and e2e suite                        |
 
 Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain local checks.
 | SearXNG live search | Docker unavailable | integration | run mocked and live provider suite against Compose SearXNG |
@@ -50,34 +50,34 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 
 ## Phase 10 administrative web
 
-| Check | Reason deferred | Category | Command / required infrastructure |
-|---|---|---|---|
-| Frontend dependency lockfile and install | npm returned HTTP 403 for `https://registry.npmjs.org/@hookform%2fresolvers` on 2026-07-23; no lockfile could be generated | build | `cd apps/web && npm install` in an approved registry environment, then commit `package-lock.json` and use `npm ci` |
-| Live FastAPI integration | no persistent API process/data fixtures available | integration | run API and `NEXT_PUBLIC_MOCK_MODE=false npm run dev` |
-| Production authentication adapter | identity provider/session host not selected | integration | configure host bearer/session adapter and authorization contract tests |
-| Live file upload | object storage and upload endpoint unavailable | integration | run source-file ingestion against configured object storage |
-| Live SSE/event streaming | worker/event broker unavailable | integration | run research/generation jobs with worker and SSE endpoint |
-| Mocked browser smoke | Playwright dependencies cannot be installed without package registry | e2e | `make web-e2e-mock` after `make web-install` |
-| Deployment production build | frontend dependencies unavailable locally | build | `make web-build` in CI/deployment environment |
+| Check                              | Reason deferred                                                                                                                                         | Category    | Command / required infrastructure                                                                                   |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------- |
+| Frozen frontend install and checks | The committed npm v3 lockfile matches `package.json`, but this environment receives HTTP 403 for locked package tarballs from the official npm registry | build / CI  | Run `npm --prefix apps/web ci` in GitHub Actions or an approved registry environment, then run all frontend scripts |
+| Live FastAPI integration           | no persistent API process/data fixtures available                                                                                                       | integration | run API and `NEXT_PUBLIC_MOCK_MODE=false npm run dev`                                                               |
+| Production authentication adapter  | identity provider/session host not selected                                                                                                             | integration | configure host bearer/session adapter and authorization contract tests                                              |
+| Live file upload                   | object storage and upload endpoint unavailable                                                                                                          | integration | run source-file ingestion against configured object storage                                                         |
+| Live SSE/event streaming           | worker/event broker unavailable                                                                                                                         | integration | run research/generation jobs with worker and SSE endpoint                                                           |
+| Mocked browser smoke               | Playwright dependencies cannot be installed without package registry                                                                                    | e2e         | `make web-e2e-mock` after `make web-install`                                                                        |
+| Deployment production build        | frontend dependencies unavailable locally                                                                                                               | build       | `make web-build` in CI/deployment environment                                                                       |
 
 | Phase 10B paginated dashboard and administration lists | documented FastAPI list/aggregate contracts are absent | API integration | add narrow read-only contracts for projects, jobs, search/fetch, clusters, questions, skills, and gaps; then add MSW/browser coverage |
 | Phase 10B component, MSW, and Playwright coverage | frontend dependencies unavailable locally | frontend tests | run `npm --prefix apps/web run test` and `npm --prefix apps/web run e2e:mock` after installing dependencies |
 
 ## Phase 10C frontend verification and API limitations
 
-| Check/category | Reason | Type | Later execution |
-|---|---|---|---|
-| `npm --prefix apps/web install` | npm registry returned HTTP 403 for `@hookform/resolvers`; no lockfile exists | dependency | install from an approved registry and commit the generated `package-lock.json` |
-| `npm --prefix apps/web run format` | frontend dependencies unavailable | frontend | run after dependency installation |
-| `npm --prefix apps/web run lint` | frontend dependencies unavailable | frontend | run after dependency installation |
-| `npm --prefix apps/web run typecheck` | frontend dependencies unavailable | frontend | run after dependency installation |
-| `npm --prefix apps/web run test` | frontend dependencies unavailable | frontend | run deterministic component and MSW feature tests after installation |
-| `npm --prefix apps/web run build` | frontend dependencies unavailable | build | run production build in CI |
-| `npm --prefix apps/web run e2e:mock` | Playwright browsers/dependencies unavailable | e2e | run mocked project-to-quality-gate smoke flow in CI |
-| Live course generation | worker/database/model runtime unavailable | integration | run API/worker contract and generated-draft navigation tests |
-| Live question generation | worker/database/model runtime unavailable | integration | run API/worker contract and draft-bank navigation tests |
-| Live evaluation execution | no Phase 9 FastAPI routes or worker runtime | integration | expose and test typed evaluation-run API contract |
-| Production authentication integration | identity provider/session host not selected | integration | configure bearer/session adapter and authorization tests |
+| Check/category                           | Reason                                                                                                                        | Type        | Later execution                                                      |
+| ---------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- | ----------- | -------------------------------------------------------------------- |
+| `npm --prefix apps/web ci`               | Official-registry tarball downloads return HTTP 403 in this environment; the committed lockfile itself matches `package.json` | dependency  | run in an approved registry environment                              |
+| `npm --prefix apps/web run format:check` | frontend dependencies cannot be installed from the official registry in this environment                                      | frontend    | run after successful `npm --prefix apps/web ci`                      |
+| `npm --prefix apps/web run lint`         | frontend dependencies unavailable                                                                                             | frontend    | run after dependency installation                                    |
+| `npm --prefix apps/web run typecheck`    | frontend dependencies unavailable                                                                                             | frontend    | run after dependency installation                                    |
+| `npm --prefix apps/web run test`         | frontend dependencies unavailable                                                                                             | frontend    | run deterministic component and MSW feature tests after installation |
+| `npm --prefix apps/web run build`        | frontend dependencies unavailable                                                                                             | build       | run production build in CI                                           |
+| `npm --prefix apps/web run e2e:mock`     | Playwright browsers/dependencies unavailable                                                                                  | e2e         | run mocked project-to-quality-gate smoke flow in CI                  |
+| Live course generation                   | worker/database/model runtime unavailable                                                                                     | integration | run API/worker contract and generated-draft navigation tests         |
+| Live question generation                 | worker/database/model runtime unavailable                                                                                     | integration | run API/worker contract and draft-bank navigation tests              |
+| Live evaluation execution                | no Phase 9 FastAPI routes or worker runtime                                                                                   | integration | expose and test typed evaluation-run API contract                    |
+| Production authentication integration    | identity provider/session host not selected                                                                                   | integration | configure bearer/session adapter and authorization tests             |
 
 The 2026-07-23 static verification found that direct imports are declared by `apps/web/package.json`
 and that the current frontend uses only the declared Next.js, React, TanStack Query, React Hook
@@ -97,12 +97,12 @@ fixtures; production routes do not consume them.
 
 ## Phase 10 frontend CI verification
 
-| Check/category | Reason | Type | Later execution |
-|---|---|---|---|
-| Authoritative `apps/web/package-lock.json` generation and frozen frontend CI | This execution environment receives HTTP 403 from the official npm registry for `@hookform/resolvers`; manually fabricating a lockfile is prohibited | dependency / CI | In an approved GitHub Actions runner, run `npm --prefix apps/web install` once, commit the generated lockfile, then let `.github/workflows/frontend.yml` run `npm ci` and all frontend jobs |
-| Live FastAPI integration, production authentication, file upload, and SSE | The CI smoke suite deliberately uses mock-only public configuration and no service infrastructure | integration | Run against explicitly provisioned API, identity, object storage, worker, and event infrastructure without exposing secrets in `NEXT_PUBLIC_*` values |
+| Check/category                                                            | Reason                                                                                                                                                             | Type            | Later execution                                                                                                                                       |
+| ------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------ | --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Frozen frontend CI                                                        | `apps/web/package-lock.json` is committed, has npm lockfile format v3, and matches `package.json`; this environment receives HTTP 403 for locked tarball downloads | dependency / CI | Let `.github/workflows/frontend.yml` run `npm --prefix apps/web ci` and its frontend jobs in GitHub Actions                                           |
+| Live FastAPI integration, production authentication, file upload, and SSE | The CI smoke suite deliberately uses mock-only public configuration and no service infrastructure                                                                  | integration     | Run against explicitly provisioned API, identity, object storage, worker, and event infrastructure without exposing secrets in `NEXT_PUBLIC_*` values |
 
-The frontend workflow is configured but must not be reported as successful until the committed
-npm-generated lockfile allows the frozen install and its jobs to run. Its mocked browser job is
-separate (not deferred) and will install Chromium, run without Docker or a backend, and upload
-reports, screenshots, and traces on failure.
+The frontend workflow explicitly installs from `apps/web/package-lock.json` with
+`npm --prefix apps/web ci`. It must not be reported as successful until that frozen install and its
+jobs run successfully. Its mocked browser job is separate (not deferred) and will install Chromium,
+run without Docker or a backend, and upload reports, screenshots, and traces on failure.
