@@ -1,0 +1,1 @@
+{"case_key":"required-source","artifact_type":"RETRIEVAL_RESULT","input":{"precision":1,"recall":1,"required_source_recall":1,"duplicate_rate":0,"rank_stability":1},"rubric":{"retrieval":"fixture only"}}

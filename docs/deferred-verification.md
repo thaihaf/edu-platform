@@ -43,3 +43,7 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | Real-model generation, independent solving (with sanitized requests), grounding and ambiguity review | no model credentials/provider configured | integration | run provider contract suite |
 | Code/SQL sandbox and large-bank duplicate detection | safe sandbox/runtime unavailable | integration | run isolated sandbox and benchmark suites |
 | Token/cost accounting | no provider runtime | integration | run model accounting fixture |
+| Live PostgreSQL evaluation persistence and immutable constraints | no PostgreSQL service | integration | run Phase 9 migration/repository suite |
+| Redis/Celery evaluation dispatch and API-to-worker flow | Docker unavailable | e2e | run Compose evaluation worker suite |
+| Real DeepEval runtime and external judge models | optional dependency/credentials unavailable | integration | configure providers and run contract suite |
+| Large-dataset performance and token/cost accounting | worker/model infrastructure unavailable | integration | run benchmark with configured provider |

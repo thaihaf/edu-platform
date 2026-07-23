@@ -47,3 +47,6 @@ All notable changes to this project are documented in this file.
 
 ## Phase 7
 - Added deterministic cited course draft generation, validation, versioning, and rollback foundations.
+
+## Phase 9 — Evaluation
+- Added provider-neutral deterministic evaluation, metric registry, quality gates, golden fixtures, baseline comparison, optional DeepEval boundary, and CI-safe smoke commands.

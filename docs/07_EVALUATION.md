@@ -68,3 +68,8 @@ acyclic skill relationships.
 ## Phase 7 quality gates
 A draft must have cited factual blocks, objectives for every lesson, resolvable prerequisites, unique
 positions, approved claim/skill linkage, and no executable content before publication.
+
+## Phase 9 platform policy
+Metric name, version and configuration hash identify a result. Deterministic validators own hard safety
+gates; optional DeepEval/model judges are advisory. Golden datasets, policies, baselines and append-only
+results make regression decisions reproducible and CI runs use deterministic fixtures only.

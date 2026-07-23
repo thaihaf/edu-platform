@@ -145,3 +145,8 @@ are immutable and rollback clones a historical version into a reviewed draft.
 immutable published `QuestionBankVersion` contain questions, options, immutable citations,
 append-only validations, revisions and review decisions. Questions retain origin, objective,
 skill, claim and evidence linkage; duplicate clusters preserve rather than delete provenance.
+
+## Phase 9 evaluation model
+Evaluation runs preserve their dataset/artifact scope, metric versions/configuration, budgets, lifecycle,
+per-case append-only results, aggregates and gate decision. Golden datasets and quality-gate policies are
+versioned: published dataset/policy versions are immutable. Baselines compare only identical metric versions.
