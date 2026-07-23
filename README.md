@@ -129,13 +129,13 @@ then use `make web-dev`. The app calls FastAPI at `NEXT_PUBLIC_API_BASE_URL`; mo
 default development boundary and never grants backend authorization. The standard web commands are
 `make web-lint`, `make web-typecheck`, `make web-test`, `make web-build`, and `make web-e2e-mock`.
 
-The web application uses npm. This repository currently has no frontend lockfile because the
-configured npm registry returned HTTP 403 while resolving `@hookform/resolvers`; consequently,
-runtime frontend verification remains deferred. In an approved registry environment, run
-`npm install` in `apps/web` once to generate and commit `package-lock.json`, then use
-`npm ci` for frozen installs and the web commands above. Do not use an alternate package manager
-or registry mirror. See `docs/phase-notes/10-frontend-verification.md` and
-`docs/deferred-verification.md`.
+The web application uses npm only and is an isolated project under `apps/web`. The authoritative
+lockfile is therefore `apps/web/package-lock.json`: generate it with `npm install` from the
+official npm registry, then use `npm ci` for every frozen install. Frontend CI uses Node.js 22,
+`npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run test`, `npm run build`, and a
+separate mocked Chromium smoke job (`npm run e2e:mock`). Do not use an alternate package manager
+or registry mirror. See `docs/phase-notes/10-frontend-ci-verification.md` and
+`docs/deferred-verification.md` for the current verification status.
 
 ### Phase 10B research and evidence administration
 

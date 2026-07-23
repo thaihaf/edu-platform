@@ -1,10 +1,17 @@
 import { defineConfig } from "@playwright/test";
+
 export default defineConfig({
   testDir: "./tests/e2e",
-  use: { baseURL: "http://127.0.0.1:3000" },
+  outputDir: "test-results",
+  reporter: [["html", { open: "never" }], ["list"]],
+  use: {
+    baseURL: "http://127.0.0.1:3000",
+    screenshot: "only-on-failure",
+    trace: "retain-on-failure",
+  },
   webServer: {
-    command: "npm run dev",
+    command: "npm run start",
     url: "http://127.0.0.1:3000",
-    reuseExistingServer: true,
+    reuseExistingServer: !process.env.CI,
   },
 });

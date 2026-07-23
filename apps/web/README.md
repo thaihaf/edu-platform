@@ -1,15 +1,20 @@
 # Phase 10 administrative web
 
 This is the strict-TypeScript Next.js App Router administrator studio. It is not a learner
-application. Use npm only: after `package-lock.json` is generated and committed in an approved
-registry environment, install with `npm ci` from this directory and run `npm run lint`,
-`npm run typecheck`, `npm run test`, `npm run build`, and `npm run e2e:mock`.
+application. It is an isolated npm project: its sole authoritative lockfile is
+`apps/web/package-lock.json`. Generate that lockfile exactly once with `npm install` using the
+official npm registry, commit it, and then use `npm ci` for all local and CI installations. Do not
+use pnpm, Yarn, an alternate registry, or a manually written lockfile.
 
-The initial verification attempt on 2026-07-23 could not create the lockfile because npm received
-HTTP 403 while fetching `@hookform/resolvers` from `https://registry.npmjs.org`. No registry
-mirror, credentials, TLS bypass, or dependency substitution was used. See
-`../../docs/phase-notes/10-frontend-verification.md` for the plan and
-`../../docs/deferred-verification.md` for the remaining deferred checks.
+Frontend CI (`.github/workflows/frontend.yml`) uses Node.js 22 and safe mock-only public values. It
+runs `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`;
+a separate Chromium job runs `npx playwright install --with-deps chromium` and `npm run e2e:mock`.
+The smoke suite starts the production build and uses `NEXT_PUBLIC_MOCK_MODE=true`, so it neither
+requires Docker nor a live backend. Browser reports, screenshots, and traces are uploaded when the
+browser job fails.
+
+See `../../docs/phase-notes/10-frontend-ci-verification.md` for verification status and
+`../../docs/deferred-verification.md` for remaining live-infrastructure checks.
 
 ## Phase 10C administration boundary
 
