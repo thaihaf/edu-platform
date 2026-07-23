@@ -74,3 +74,11 @@ All notable changes to this project are documented in this file.
   that the current FastAPI application does not yet expose.
 - Added reusable textual confidence/origin/gate/regression, immutable-version, protected-content,
   citation, and JSON-safety admin primitives plus Phase 10C API-limit and UX documentation.
+
+## Phase 10 — Frontend verification
+
+- Added the Phase 10 frontend verification plan and documented npm as the sole package manager.
+- Recorded the exact registry blocker: npm received HTTP 403 fetching `@hookform/resolvers`, so
+  no lockfile or runtime frontend checks were claimed as verified.
+- Recorded static dependency, safe-rendering, browser-storage, and API-contract-limit observations
+  without substituting them for unavailable runtime checks.
