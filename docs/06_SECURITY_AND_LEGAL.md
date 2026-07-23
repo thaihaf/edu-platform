@@ -87,3 +87,11 @@ Human-authored or locked blocks cannot be overwritten by AI regeneration.
 ## Phase 9 evaluation safety
 Evaluation never sends secrets, credentials, tools, or raw vendor prompts to a judge. Injection-like source
 text is preserved as evidence but cannot change a metric, gate, or publication decision.
+
+## Phase 10B admin-web controls
+
+Phase 10B renders source and claim text as React text nodes and does not use
+`dangerouslySetInnerHTML`. URL values are displayed as text; no source-supplied script, object
+storage credential, authentication token, or raw model payload is exposed. Mutations retain the
+FastAPI structured error envelope and trace ID without logging credentials. Text ingestion and
+evidence-building mutations send idempotency keys when the API requires them.

@@ -58,3 +58,10 @@ All notable changes to this project are documented in this file.
   common error/loading/empty/status primitives, and deterministic test specifications.
 - Documented the frontend architecture, API/source-of-truth boundary, security/accessibility
   approach, environment configuration, mock strategy, and deferred live verification.
+
+## Phase 10B — Research and evidence administration
+
+- Added project-scoped Phase 10B routes, typed FastAPI transport models, source ingestion,
+  bounded research-job polling/actions, and claim-review UI with structured API errors.
+- Added explicit non-mocking availability states for missing paginated administrative API reads.
+- Documented API, security, accessibility, mock-fixture, and verification limits for this phase.

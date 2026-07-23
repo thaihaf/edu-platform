@@ -2,14 +2,21 @@ import { AdminPage } from "@/components/page";
 const rows = [
   {
     name: "Active projects",
-    status: "API-backed",
+    status: "Not available",
     detail:
-      "Project aggregate endpoint recommended for dashboard optimization.",
+      "A paginated project-list or dashboard aggregate endpoint is required; the UI does not count unbounded records.",
   },
   {
-    name: "Research jobs",
-    status: "No selection",
-    detail: "Select a project to poll job progress.",
+    name: "Research jobs and failures",
+    status: "Not available",
+    detail:
+      "Individual job polling is supported after selection; a project/job list is not documented.",
+  },
+  {
+    name: "Sources, claims, gaps, and reported questions",
+    status: "Partial API coverage",
+    detail:
+      "Project source and claim reads exist. Aggregate counts, gaps, and reported-question review lists require read contracts.",
   },
   {
     name: "Deferred infrastructure checks",

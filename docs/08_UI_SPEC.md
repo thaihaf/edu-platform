@@ -85,3 +85,14 @@ rendered as text/sanitized Markdown only; untrusted HTML is never injected. Form
 error summaries, keyboard focus, confirmation for state-changing actions, and textual status in
 addition to visual styling. The phase scaffold provides the shell and primary context pages; live
 endpoint completeness is deferred until the API exposes list/detail contracts consistently.
+
+## Phase 10B research and evidence administration
+
+Phase 10B adds project detail plus project-scoped Sources, Research, Claims, Source Clusters,
+Reported Questions, Skills, and Knowledge Gaps routes. The implemented source text-ingestion,
+research control, and claim-review panels use typed FastAPI contracts, preserve structured error
+trace IDs, prevent duplicate submissions, and use confirmation before lifecycle/review mutations.
+Research polling stops on terminal statuses. Where the backend lacks a paginated list/detail
+contract, the route visibly reports that the feature is unavailable rather than showing invented
+records. Tables retain semantic headers and responsive overflow; source content is rendered as
+safe text. Severity, status, and lineage caution use written labels, not color alone.
