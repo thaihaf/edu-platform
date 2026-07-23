@@ -5,5 +5,11 @@ test("admin shell exposes bounded contexts", async ({ page }) => {
     "Evaluation",
   );
   await page.getByRole("link", { name: "Projects" }).click();
-  await expect(page.getByRole("heading", { name: "Projects" })).toBeVisible();
+  await expect(
+    page.getByRole("heading", {
+      level: 1,
+      name: "Projects",
+      exact: true,
+    }),
+  ).toBeVisible();
 });
