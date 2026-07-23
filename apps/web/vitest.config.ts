@@ -6,7 +6,18 @@ export default defineConfig({
   resolve: { alias: { "@": path.resolve(__dirname, ".") } },
   test: {
     environment: "jsdom",
-    exclude: ["tests/e2e/**"],
+    include: ["tests/**/*.test.{ts,tsx}"],
+    exclude: [
+      "**/node_modules/**",
+      "**/.next/**",
+      "**/dist/**",
+      "**/build/**",
+      "**/coverage/**",
+      "**/test-results/**",
+      "**/playwright-report/**",
+      "tests/e2e/**",
+      "**/*.spec.ts",
+    ],
     globals: true,
   },
 });
