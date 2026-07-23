@@ -131,3 +131,13 @@ business policy. It sends `X-Trace-ID`, uses `Idempotency-Key` for asynchronous 
 research, course, question, and evaluation starts, and renders the standard error envelope.
 Dashboard aggregates and several administrative list/detail actions require additional read-only
 API contracts for efficient production use; the browser does not recreate those policies.
+
+## Phase 10B administrative API limitations
+
+Phase 10B consumes the currently implemented project detail, source list/detail, text/URL
+ingestion, ingestion-job, research-job detail/control, claim list/detail, claim evidence,
+contradiction, confidence, and review endpoints. Production admin views need additional paginated
+reads before they can provide project/research-job lists, dashboard aggregates, search/query/result
+and fetch administration, source-cluster reads, reported-question reads, skill/prerequisite reads,
+and knowledge-gap reads. The UI shows a typed unavailable state for those contracts; it does not
+mock production data or reproduce backend policy.

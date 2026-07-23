@@ -27,6 +27,79 @@ export type RequestOptions = {
   query?: Record<string, string | number | boolean | undefined>;
   retry?: boolean;
 };
+export type Project = {
+  id: string;
+  title: string;
+  description: string;
+  domain: string;
+  target: string;
+  locale: string;
+  research_depth: number;
+  status: string;
+  updated_at: string;
+};
+export type Source = {
+  id: string;
+  project_id: string;
+  source_type: string;
+  title: string;
+  canonical_url?: string | null;
+  publisher?: string | null;
+  updated_at: string;
+};
+export type IngestionJob = {
+  id: string;
+  status: string;
+  stage: string;
+  progress_percent: number;
+  error_code?: string | null;
+  error_message?: string | null;
+};
+export type ResearchJob = {
+  id: string;
+  project_id: string;
+  status: string;
+  current_phase: string;
+  progress_percent: number;
+  followup_round: number;
+  budgets: {
+    queries_used: number;
+    query_budget: number;
+    sources_selected: number;
+    source_budget: number;
+    model_calls_used: number;
+    model_call_budget: number;
+  };
+  stop_reason?: string | null;
+  created_at: string;
+  completed_at?: string | null;
+};
+export type Claim = {
+  id: string;
+  project_id: string;
+  normalized_statement: string;
+  claim_type: string;
+  status: string;
+  review_status: string;
+  confidence: number;
+  confidence_components: Record<string, number>;
+  temporal_scope: Record<string, unknown>;
+  updated_at: string;
+};
+export type ReviewDecision =
+  | "APPROVE"
+  | "REJECT"
+  | "REQUEST_CHANGES"
+  | "MARK_DISPUTED"
+  | "MARK_OBSOLETE";
+export const apiPaths = {
+  project: (id: string) => `/projects/${id}`,
+  sources: (id: string) => `/projects/${id}/sources`,
+  source: (id: string) => `/sources/${id}`,
+  research: (id: string) => `/research-jobs/${id}`,
+  claims: (id: string) => `/projects/${id}/claims`,
+  claim: (id: string) => `/claims/${id}`,
+} as const;
 export const idempotencyKey = () => crypto.randomUUID();
 export async function api<T>(
   path: string,

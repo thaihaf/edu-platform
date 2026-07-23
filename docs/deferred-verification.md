@@ -59,3 +59,6 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | Live SSE/event streaming | worker/event broker unavailable | integration | run research/generation jobs with worker and SSE endpoint |
 | Mocked browser smoke | Playwright dependencies cannot be installed without package registry | e2e | `make web-e2e-mock` after `make web-install` |
 | Deployment production build | frontend dependencies unavailable locally | build | `make web-build` in CI/deployment environment |
+
+| Phase 10B paginated dashboard and administration lists | documented FastAPI list/aggregate contracts are absent | API integration | add narrow read-only contracts for projects, jobs, search/fetch, clusters, questions, skills, and gaps; then add MSW/browser coverage |
+| Phase 10B component, MSW, and Playwright coverage | frontend dependencies unavailable locally | frontend tests | run `npm --prefix apps/web run test` and `npm --prefix apps/web run e2e:mock` after installing dependencies |

@@ -133,3 +133,11 @@ The package registry was unavailable while this phase was prepared, so a generat
 runtime frontend verification remain deferred. The manifest declares the intended dependencies;
 run `npm install` in `apps/web` in an approved environment to generate and commit the lockfile
 before enabling the web CI job. See `docs/deferred-verification.md`.
+
+### Phase 10B research and evidence administration
+
+Phase 10B adds API-backed project detail, text-source ingestion, source detail, research-job
+control, and claim review routes. Administrative list views whose paginated FastAPI read contracts
+do not exist deliberately show an availability notice rather than mock data. The documented gaps
+include project and research-job lists, search/fetch administration, clusters, reported questions,
+skills/prerequisites, and knowledge gaps; see `docs/phase-notes/10b-research-evidence-admin.md`.
