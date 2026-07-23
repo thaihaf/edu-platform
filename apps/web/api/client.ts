@@ -150,3 +150,64 @@ export async function api<T>(
     window.clearTimeout(timer);
   }
 }
+
+export type CourseGenerationJob = {
+  id: string;
+  project_id: string;
+  course_id?: string | null;
+  status: string;
+  current_stage: string;
+  progress_percent: number;
+  target_outcome: string;
+  target_audience: string;
+  learner_profile?: string | null;
+  locale: string;
+  time_budget?: number | null;
+  module_limit?: number | null;
+  lesson_limit?: number | null;
+  policy_version: string;
+  prompt_version: string;
+  error_code?: string | null;
+  error_message?: string | null;
+  created_at: string;
+  updated_at: string;
+};
+export type QuestionGenerationJob = {
+  id: string;
+  project_id: string;
+  status: string;
+  current_stage: string;
+  progress_percent: number;
+  requested_question_types: string[];
+  requested_count: number;
+  generated_count: number;
+  accepted_count: number;
+  rejected_count: number;
+  model_calls_used: number;
+  tokens_used?: number | null;
+  estimated_cost?: number | null;
+  policy_version: string;
+  prompt_version: string;
+  error_code?: string | null;
+  error_message?: string | null;
+};
+export type JobEvent = {
+  id?: string;
+  type?: string;
+  stage?: string;
+  message?: string;
+  created_at?: string;
+};
+export const phase10cPaths = {
+  courseGeneration: (projectId: string) =>
+    `/projects/${projectId}/course-generation-jobs`,
+  courseGenerationJob: (jobId: string) => `/course-generation-jobs/${jobId}`,
+  courseGenerationEvents: (jobId: string) =>
+    `/course-generation-jobs/${jobId}/events`,
+  questionGeneration: (projectId: string) =>
+    `/projects/${projectId}/question-generation-jobs`,
+  questionGenerationJob: (jobId: string) =>
+    `/question-generation-jobs/${jobId}`,
+  questionGenerationEvents: (jobId: string) =>
+    `/question-generation-jobs/${jobId}/events`,
+} as const;

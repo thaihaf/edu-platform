@@ -11,3 +11,12 @@ When dependencies are available, add MSW fixtures for the documented project det
 list/text-ingestion/job polling, research job/control, and claim/review endpoints. Fixtures must
 include the FastAPI error envelope and trace ID. Missing production list endpoints must be tested
 as the UI's explicit availability state, not replaced with fabricated success fixtures.
+
+## Phase 10C fixtures
+
+When dependencies are available, add deterministic MSW fixtures here for accepted course and
+question generation jobs, terminal job events, and the project → generation → validation →
+question approval → deterministic evaluation → failed-gate smoke flow. Fixtures must use the
+same typed transport envelopes as FastAPI, including trace IDs and 202 semantics. They are never
+loaded by production routes and must not represent unavailable course editor, review, dataset,
+policy, baseline, or evaluation endpoints as live backend functionality.

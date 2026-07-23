@@ -141,3 +141,11 @@ control, and claim review routes. Administrative list views whose paginated Fast
 do not exist deliberately show an availability notice rather than mock data. The documented gaps
 include project and research-job lists, search/fetch administration, clusters, reported questions,
 skills/prerequisites, and knowledge gaps; see `docs/phase-notes/10b-research-evidence-admin.md`.
+
+### Phase 10C course, question, and evaluation administration
+
+Phase 10C adds project-scoped API-backed course and question generation forms and polling job
+views. The remaining course-editor, question review/versioning, and evaluation/dataset/policy/
+baseline screens deliberately show typed availability states because the current FastAPI app does
+not expose their read/write contracts. The browser never invents records, validation results,
+publication outcomes, or evaluation results. See `docs/phase-notes/10c-course-question-evaluation-admin.md`.

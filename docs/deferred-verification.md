@@ -62,3 +62,26 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 
 | Phase 10B paginated dashboard and administration lists | documented FastAPI list/aggregate contracts are absent | API integration | add narrow read-only contracts for projects, jobs, search/fetch, clusters, questions, skills, and gaps; then add MSW/browser coverage |
 | Phase 10B component, MSW, and Playwright coverage | frontend dependencies unavailable locally | frontend tests | run `npm --prefix apps/web run test` and `npm --prefix apps/web run e2e:mock` after installing dependencies |
+
+## Phase 10C frontend verification and API limitations
+
+| Check/category | Reason | Type | Later execution |
+|---|---|---|---|
+| `npm --prefix apps/web install` | npm registry/package lock unavailable in this environment | dependency | install from an approved registry and commit the generated lockfile |
+| `npm --prefix apps/web run format` | frontend dependencies unavailable | frontend | run after dependency installation |
+| `npm --prefix apps/web run lint` | frontend dependencies unavailable | frontend | run after dependency installation |
+| `npm --prefix apps/web run typecheck` | frontend dependencies unavailable | frontend | run after dependency installation |
+| `npm --prefix apps/web run test` | frontend dependencies unavailable | frontend | run deterministic component and MSW feature tests after installation |
+| `npm --prefix apps/web run build` | frontend dependencies unavailable | build | run production build in CI |
+| `npm --prefix apps/web run e2e:mock` | Playwright browsers/dependencies unavailable | e2e | run mocked project-to-quality-gate smoke flow in CI |
+| Live course generation | worker/database/model runtime unavailable | integration | run API/worker contract and generated-draft navigation tests |
+| Live question generation | worker/database/model runtime unavailable | integration | run API/worker contract and draft-bank navigation tests |
+| Live evaluation execution | no Phase 9 FastAPI routes or worker runtime | integration | expose and test typed evaluation-run API contract |
+| Production authentication integration | identity provider/session host not selected | integration | configure bearer/session adapter and authorization tests |
+
+The current backend lacks production list/detail/mutation contracts for course editor/version
+validation and publication; question banks, questions, revisions, review queues, and duplicate
+clusters; evaluation runs/results; golden datasets; quality-gate policies; and baselines. Phase
+10C renders typed unavailable states for these capabilities rather than emulating successful
+production behavior. `apps/web/tests/mocks` remains the only location for deterministic mock
+fixtures; production routes do not consume them.
