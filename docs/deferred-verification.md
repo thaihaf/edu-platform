@@ -40,6 +40,6 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | Rendering-sanitization integration | web rendering runtime unavailable | integration | run API-to-renderer sanitization suite |
 | Live PostgreSQL Phase 8 question persistence and constraints | no PostgreSQL service | integration | run question repository and migration suite against PostgreSQL |
 | Redis/Celery question generation and API-to-worker execution | Docker unavailable | e2e | run Compose API, worker, and Redis question suite |
-| Real-model generation, independent solving, grounding and ambiguity review | no model credentials/provider configured | integration | run provider contract suite |
+| Real-model generation, independent solving (with sanitized requests), grounding and ambiguity review | no model credentials/provider configured | integration | run provider contract suite |
 | Code/SQL sandbox and large-bank duplicate detection | safe sandbox/runtime unavailable | integration | run isolated sandbox and benchmark suites |
 | Token/cost accounting | no provider runtime | integration | run model accounting fixture |
