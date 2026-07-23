@@ -2,13 +2,16 @@
 
 This is the strict-TypeScript Next.js App Router administrator studio. It is not a learner
 application. It is an isolated npm project: its sole authoritative lockfile is
-`apps/web/package-lock.json`. Generate that lockfile exactly once with `npm install` using the
-official npm registry, commit it, and then use `npm ci` for all local and CI installations. Do not
-use pnpm, Yarn, an alternate registry, or a manually written lockfile.
+`apps/web/package-lock.json`. It is an npm lockfile (format version 3) whose root dependency
+metadata matches `package.json`; use `npm --prefix apps/web ci` for all local and CI installations.
+Do not use pnpm, Yarn, an alternate registry, or a manually written lockfile.
 
 Frontend CI (`.github/workflows/frontend.yml`) uses Node.js 22 and safe mock-only public values. It
-runs `npm run format:check`, `npm run lint`, `npm run typecheck`, `npm run test`, and `npm run build`;
-a separate Chromium job runs `npx playwright install --with-deps chromium` and `npm run e2e:mock`.
+runs `npm --prefix apps/web run format:check`, `npm --prefix apps/web run lint`,
+`npm --prefix apps/web run typecheck`, `npm --prefix apps/web run test`, and
+`npm --prefix apps/web run build`; a separate Chromium job runs
+`npm --prefix apps/web exec -- playwright install --with-deps chromium` and
+`npm --prefix apps/web run e2e:mock`.
 The smoke suite starts the production build and uses `NEXT_PUBLIC_MOCK_MODE=true`, so it neither
 requires Docker nor a live backend. Browser reports, screenshots, and traces are uploaded when the
 browser job fails.

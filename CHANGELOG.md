@@ -1,6 +1,7 @@
 # Changelog
 
 ## Phase 8
+
 - Add framework-neutral validated assessment-question contracts, deterministic quality gates,
   question-bank drafts/publication, review history, and an asynchronous generation-job API boundary.
 - Complete project-scoped idempotency, meaningful non-choice answer/rubric validation, approval revocation, direct reported-evidence citations, independent-solver isolation, and ambiguity publication gates.
@@ -10,6 +11,7 @@ All notable changes to this project are documented in this file.
 ## [0.3.0] - 2026-07-22
 
 ### Added
+
 - Vendor-neutral ingestion jobs, structured document/chunk domain models, ports,
   deterministic in-memory adapters, plain-text parsing, chunking, embeddings, and
   URL-registration validation.
@@ -30,25 +32,31 @@ All notable changes to this project are documented in this file.
 ## [0.2.0] - 2026-07-22
 
 ### Added
+
 - Phase 2 domain entities, lifecycle rules, repository ports, use cases, SQLAlchemy metadata, and Alembic schema migration.
 - `/api/v1` workspace, project, source/snapshot, and course-version foundation endpoints with trace-aware errors.
 
 ## Phase 4 — Search and crawling
+
 - Added provider-neutral web search/fetch contracts, deterministic SearXNG mapping and safe mocked adapters.
 - Added URL canonicalization, DNS-based SSRF checks, redirect validation, robots fail-closed policy, HTML normalization, RRF fusion, and disabled browser boundary.
 
 ## Phase 5
+
 - Added provider-neutral, resumable research-job contracts, typed checkpoint state, budget and lifecycle controls, and asynchronous job-control API surface.
 - Added deterministic node-runner checkpoints, immutable artifact persistence, idempotent finalization, versioned structured prompt descriptors, and injection-safe source delimiters for unit testing.
 - Declared the optional-at-runtime LangGraph workflow adapter and documented deferred live orchestration verification.
 
 ## Phase 6
+
 - Added deterministic evidence and knowledge graph foundations, claim fingerprints, confidence policy, immutable evidence links, review decisions and relational migration groundwork.
 
 ## Phase 7
+
 - Added deterministic cited course draft generation, validation, versioning, and rollback foundations.
 
 ## Phase 9 — Evaluation
+
 - Added provider-neutral deterministic evaluation, metric registry, quality gates, golden fixtures, baseline comparison, optional DeepEval boundary, and CI-safe smoke commands.
 
 ## Phase 10 — Admin web
@@ -82,6 +90,7 @@ All notable changes to this project are documented in this file.
   smoke job with failure artifacts.
 - Normalized the frontend format-check and ESLint commands and configured Playwright failure traces
   and screenshots for the mocked smoke suite.
-- The official npm registry remains unavailable in this execution environment (HTTP 403 for
-  `@hookform/resolvers`), so `apps/web/package-lock.json` could not be generated or committed and
-  no runtime frontend check is claimed as verified until the approved CI environment generates it.
+- Committed the npm-generated `apps/web/package-lock.json` and updated frontend CI to run every
+  frontend check from that lockfile with `npm --prefix apps/web ci`.
+- Verified lockfile metadata matches `apps/web/package.json`. Local install-dependent frontend
+  checks remain unclaimed because the environment returns HTTP 403 for locked npm tarball downloads.
