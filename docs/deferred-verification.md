@@ -52,7 +52,7 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 
 | Check | Reason deferred | Category | Command / required infrastructure |
 |---|---|---|---|
-| Frontend dependency lockfile and install | package index returned HTTP 403 in this environment | build | `cd apps/web && npm install` in an approved registry environment, then commit `package-lock.json` |
+| Frontend dependency lockfile and install | npm returned HTTP 403 for `https://registry.npmjs.org/@hookform%2fresolvers` on 2026-07-23; no lockfile could be generated | build | `cd apps/web && npm install` in an approved registry environment, then commit `package-lock.json` and use `npm ci` |
 | Live FastAPI integration | no persistent API process/data fixtures available | integration | run API and `NEXT_PUBLIC_MOCK_MODE=false npm run dev` |
 | Production authentication adapter | identity provider/session host not selected | integration | configure host bearer/session adapter and authorization contract tests |
 | Live file upload | object storage and upload endpoint unavailable | integration | run source-file ingestion against configured object storage |
@@ -67,7 +67,7 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 
 | Check/category | Reason | Type | Later execution |
 |---|---|---|---|
-| `npm --prefix apps/web install` | npm registry/package lock unavailable in this environment | dependency | install from an approved registry and commit the generated lockfile |
+| `npm --prefix apps/web install` | npm registry returned HTTP 403 for `@hookform/resolvers`; no lockfile exists | dependency | install from an approved registry and commit the generated `package-lock.json` |
 | `npm --prefix apps/web run format` | frontend dependencies unavailable | frontend | run after dependency installation |
 | `npm --prefix apps/web run lint` | frontend dependencies unavailable | frontend | run after dependency installation |
 | `npm --prefix apps/web run typecheck` | frontend dependencies unavailable | frontend | run after dependency installation |
@@ -78,6 +78,15 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | Live question generation | worker/database/model runtime unavailable | integration | run API/worker contract and draft-bank navigation tests |
 | Live evaluation execution | no Phase 9 FastAPI routes or worker runtime | integration | expose and test typed evaluation-run API contract |
 | Production authentication integration | identity provider/session host not selected | integration | configure bearer/session adapter and authorization tests |
+
+The 2026-07-23 static verification found that direct imports are declared by `apps/web/package.json`
+and that the current frontend uses only the declared Next.js, React, TanStack Query, React Hook
+Form/Zod, Vitest, Testing Library, and Playwright packages. It also confirmed that no web source
+uses `dangerouslySetInnerHTML`, browser storage, or token logging. These static observations do
+not replace lint, strict typecheck, tests, build, or browser verification. The FastAPI route file
+contains more legacy course read/write routes than the Phase 10C limitations document describes;
+their response contracts must be reconciled during the blocked runtime verification rather than
+being inferred or fabricated in the browser.
 
 The current backend lacks production list/detail/mutation contracts for course editor/version
 validation and publication; question banks, questions, revisions, review queues, and duplicate

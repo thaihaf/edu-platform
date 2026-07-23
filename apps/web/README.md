@@ -1,8 +1,15 @@
-# Web application placeholder
+# Phase 10 administrative web
 
-The learner and administration web clients are intentionally deferred to the UI
-phases. This directory reserves the monorepo boundary so the FastAPI backend does
-not depend on a frontend framework.
+This is the strict-TypeScript Next.js App Router administrator studio. It is not a learner
+application. Use npm only: after `package-lock.json` is generated and committed in an approved
+registry environment, install with `npm ci` from this directory and run `npm run lint`,
+`npm run typecheck`, `npm run test`, `npm run build`, and `npm run e2e:mock`.
+
+The initial verification attempt on 2026-07-23 could not create the lockfile because npm received
+HTTP 403 while fetching `@hookform/resolvers` from `https://registry.npmjs.org`. No registry
+mirror, credentials, TLS bypass, or dependency substitution was used. See
+`../../docs/phase-notes/10-frontend-verification.md` for the plan and
+`../../docs/deferred-verification.md` for the remaining deferred checks.
 
 ## Phase 10C administration boundary
 
