@@ -85,6 +85,10 @@ All notable changes to this project are documented in this file.
 
 ## Phase 10 — Frontend verification
 
+- Repaired the Next 15 ESLint flat-config bridge without disabling Core Web Vitals rules, restored typed Phase 10C compatibility and absent-job states, and added incompatible-metric coverage.
+- Configured Vitest's automatic React JSX runtime and Playwright-test exclusion, and normalized mocked API request headers before idempotency-key assertions.
+- Recorded the actual local verification outcome: frontend formatting passed; registry HTTP 403 responses left the dependency tree incomplete for the remaining frontend commands; backend checks, evaluation smoke/golden checks, and diff validation passed.
+
 - Added the Phase 10 frontend CI workflow design: Node.js 22, frozen npm installation, formatting,
   lint, strict typecheck, unit/component tests, production build, and a separate mocked Chromium
   smoke job with failure artifacts.

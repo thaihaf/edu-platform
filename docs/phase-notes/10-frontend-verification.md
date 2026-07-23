@@ -26,3 +26,31 @@ features or begin Phase 11.
 There was no `package-lock.json`, `pnpm-lock.yaml`, or `yarn.lock` at branch creation. The root
 README and Makefile document npm commands for `apps/web`, so npm is the sole package manager for
 this task. No alternate lockfile will be created.
+
+## 2026-07-23 verification repair
+
+The installed Next 15 / `eslint-config-next` 15 configuration exposes the Next rules as a
+legacy shareable config rather than an ESM flat-config array. The ESLint flat config now adapts
+`next/core-web-vitals` with `FlatCompat`, preserving the complete Next Core Web Vitals rule set.
+It does not disable or replace any Next.js rules.
+
+The Phase 10C regression indicator now receives its typed optional `compatible` prop and keeps
+its explicit incompatible-metric-version text. Both generation-job detail views now distinguish
+loading, request-error, and absent-job states before binding a typed job value, so job properties
+are never read from an absent query result. The component test covers the incompatible metric
+state.
+
+Vitest now uses Vite's automatic JSX runtime and excludes `tests/e2e/**`; Playwright continues
+to own that directory through `playwright.config.ts`. The typed API-client test normalizes the
+mock request headers with `new Headers(...)` before reading `Idempotency-Key`.
+
+### Actual local results
+
+- `npm run format:check` passed.
+- `npm run lint` and `npm run typecheck` could not complete because the local `node_modules`
+  tree was incomplete after the registry denied locked package tarball downloads with HTTP 403.
+- `npm run test`, `npm run build`, and `npm run e2e:mock` consequently could not start because
+  their executables were absent. The Playwright startup configuration was not weakened.
+- `make check` passed its Ruff format, Ruff lint, and mypy stages; `pytest -m "not integration
+  and not e2e"` passed (51 tests); `make eval-smoke`, `make eval-golden`, and `git diff --check`
+  passed.

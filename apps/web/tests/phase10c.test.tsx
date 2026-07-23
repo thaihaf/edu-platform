@@ -43,11 +43,13 @@ describe("Phase 10C safety primitives", () => {
       <>
         <QualityGateStatus value="FAILED" />
         <RegressionDelta value={-0.2} />
+        <RegressionDelta compatible={false} value={0.1} />
       </>,
     );
     expect(screen.getByText(/Quality gate: FAILED/)).toBeVisible();
     expect(screen.getByLabelText("Metric regression")).toHaveTextContent(
       "-0.20",
     );
+    expect(screen.getByText("Incompatible metric version")).toBeVisible();
   });
 });
