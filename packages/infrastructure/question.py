@@ -5,13 +5,14 @@ from copy import deepcopy
 from typing import Any
 from uuid import UUID
 
+from packages.domain.evidence import EvidenceLink
 from packages.domain.question import *
 
 
 class InMemoryQuestionRepository:
     def __init__(self) -> None:
-        self.jobs: dict[UUID, QuestionGenerationJob] = {}; self.banks: dict[UUID, QuestionBank] = {}; self.versions: dict[UUID, QuestionBankVersion] = {}; self.questions: dict[UUID, Question] = {}; self.options: dict[UUID, list[QuestionOption]] = defaultdict(list); self.citations: dict[UUID, list[QuestionCitation]] = defaultdict(list); self.validations: dict[UUID, list[QuestionValidationResult]] = defaultdict(list); self.revisions: dict[UUID, list[QuestionRevision]] = defaultdict(list); self.decisions: dict[UUID, list[QuestionReviewDecision]] = defaultdict(list); self.blueprints: dict[UUID, list[QuestionBlueprint]] = defaultdict(list); self.events: dict[UUID, list[dict[str, Any]]] = defaultdict(list)
-    async def job_by_key(self, key: str) -> QuestionGenerationJob | None: return next((j for j in self.jobs.values() if j.idempotency_key == key), None)
+        self.jobs: dict[UUID, QuestionGenerationJob] = {}; self.banks: dict[UUID, QuestionBank] = {}; self.versions: dict[UUID, QuestionBankVersion] = {}; self.questions: dict[UUID, Question] = {}; self.options: dict[UUID, list[QuestionOption]] = defaultdict(list); self.citations: dict[UUID, list[QuestionCitation]] = defaultdict(list); self.evidence_links: dict[UUID, EvidenceLink] = {}; self.validations: dict[UUID, list[QuestionValidationResult]] = defaultdict(list); self.revisions: dict[UUID, list[QuestionRevision]] = defaultdict(list); self.decisions: dict[UUID, list[QuestionReviewDecision]] = defaultdict(list); self.blueprints: dict[UUID, list[QuestionBlueprint]] = defaultdict(list); self.events: dict[UUID, list[dict[str, Any]]] = defaultdict(list)
+    async def job_by_key(self, project_id: UUID, key: str) -> QuestionGenerationJob | None: return next((j for j in self.jobs.values() if j.project_id == project_id and j.idempotency_key == key), None)
     async def add_job(self, job: QuestionGenerationJob) -> None: self.jobs[job.id] = job
     async def get_job(self, ident: UUID) -> QuestionGenerationJob | None: return self.jobs.get(ident)
     async def event(self, job: QuestionGenerationJob, stage: str, payload: dict[str, Any]) -> None: self.events[job.id].append({"stage": stage, "payload": deepcopy(payload)})
@@ -29,6 +30,8 @@ class InMemoryQuestionRepository:
     async def project_questions(self, project: UUID) -> list[Question]: return [q for q in self.questions.values() if (await self.get_bank((await self.get_version(q.question_bank_version_id)).question_bank_id)).project_id == project]  # type: ignore[union-attr]
     async def add_option(self, option: QuestionOption) -> None: self.options[option.question_id].append(option)
     async def add_citation(self, citation: QuestionCitation) -> None: self.citations[citation.question_id].append(citation)
+    async def add_evidence_link(self, link: EvidenceLink) -> None: self.evidence_links[link.id] = link
+    async def get_evidence_link(self, ident: UUID) -> EvidenceLink | None: return self.evidence_links.get(ident)
     async def add_validation(self, result: QuestionValidationResult) -> None:
         if not any(x.validator_type == result.validator_type and x.status == result.status and x.reasons == result.reasons for x in self.validations[result.question_id]): self.validations[result.question_id].append(result)
     async def add_revision(self, revision: QuestionRevision) -> None: self.revisions[revision.question_id].append(revision)

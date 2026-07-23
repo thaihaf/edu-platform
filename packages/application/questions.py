@@ -4,7 +4,7 @@ from copy import deepcopy
 from hashlib import sha256
 import json
 from typing import Any
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from packages.domain.evidence import ClaimStatus, QuestionOriginType, ReportedQuestion, ReviewStatus
 from packages.domain.question import *
@@ -12,13 +12,17 @@ from packages.domain.question import *
 
 def fingerprint(value: Any) -> str: return sha256(json.dumps(value, sort_keys=True, default=str).encode()).hexdigest()
 def _result(question: Question, kind: ValidationType, ok: bool, *reasons: str) -> QuestionValidationResult: return QuestionValidationResult(question.id, kind, ValidationStatus.PASS if ok else ValidationStatus.FAIL, tuple(reasons))
+def _has_answer(value: Any) -> bool:
+    if isinstance(value, dict): return any(_has_answer(item) for item in value.values())
+    if isinstance(value, (list, tuple, set)): return any(_has_answer(item) for item in value)
+    return value is not None and (not isinstance(value, str) or bool(value.strip()))
 
 
 class QuestionService:
     def __init__(self, repository: Any) -> None: self.r = repository
     async def start(self, job: QuestionGenerationJob) -> QuestionGenerationJob:
         if job.requested_count < 1 or not job.requested_question_types: raise QuestionError("QUESTION_GENERATION_INPUT_INVALID", "A count and question type are required")
-        old = await self.r.job_by_key(job.idempotency_key)
+        old = await self.r.job_by_key(job.project_id, job.idempotency_key)
         if old:
             if old.request_fingerprint != job.request_fingerprint: raise QuestionError("IDEMPOTENCY_CONFLICT", "Idempotency key payload differs")
             return old
@@ -47,6 +51,7 @@ class QuestionService:
         options = self.r.options[q.id]; results = [_result(q, ValidationType.STRUCTURE, bool(q.stem.strip()), "stem required"), _result(q, ValidationType.ORIGIN_VALIDITY, q.origin_type in set(OriginType), "invalid origin")]
         if q.question_type is QuestionType.SINGLE_CHOICE: results += [_result(q, ValidationType.ANSWER_CORRECTNESS, sum(o.is_correct for o in options) == 1, "single choice requires exactly one correct option"), _result(q, ValidationType.DISTRACTOR_QUALITY, all(o.option_text.casefold() not in {"all of the above", "none of the above"} for o in options), "unsupported catch-all distractor")]
         if q.question_type is QuestionType.MULTIPLE_CHOICE: results.append(_result(q, ValidationType.ANSWER_CORRECTNESS, 0 < sum(o.is_correct for o in options) < len(options), "multiple choice requires a non-total correct set"))
+        if q.question_type not in {QuestionType.SINGLE_CHOICE, QuestionType.MULTIPLE_CHOICE}: results.append(_result(q, ValidationType.ANSWER_CORRECTNESS, _has_answer(q.answer_json), "question requires a non-empty answer"))
         if q.origin_type in {OriginType.SOURCE_DERIVED, OriginType.VERBATIM_REPORTED, OriginType.PARAPHRASED_REPORTED}: results.append(_result(q, ValidationType.GROUNDING, bool(self.r.citations[q.id]), "source-derived question requires citation"))
         if q.origin_type in {OriginType.VERBATIM_REPORTED, OriginType.PARAPHRASED_REPORTED}: results.append(_result(q, ValidationType.ORIGIN_VALIDITY, bool(q.linked_reported_question_id and self.r.citations[q.id]), "reported origin requires direct evidence"))
         if q.question_type in {QuestionType.CODING, QuestionType.SQL}: results.append(_result(q, ValidationType.CODE_EXECUTION if q.question_type is QuestionType.CODING else ValidationType.SQL_EXECUTION, False, "execution sandbox unavailable"))
@@ -70,6 +75,7 @@ class QuestionService:
         old = q.review_status; new = QuestionReviewStatus.HUMAN_APPROVED if decision in {ReviewDecisionType.APPROVE, ReviewDecisionType.ACCEPT_REVISION} else QuestionReviewStatus.HUMAN_REJECTED if decision is ReviewDecisionType.REJECT else QuestionReviewStatus.NEEDS_REVIEW
         q.review_status = new
         if new is QuestionReviewStatus.HUMAN_APPROVED and not any(x.status is ValidationStatus.FAIL for x in self.r.validations[q.id]): q.publication_status = QuestionPublicationStatus.APPROVED
+        if decision in {ReviewDecisionType.REJECT, ReviewDecisionType.REQUEST_CHANGES}: q.publication_status = QuestionPublicationStatus.DRAFT
         if decision is ReviewDecisionType.RETIRE: q.publication_status = QuestionPublicationStatus.RETIRED
         bank = await self.r.get_bank(version.question_bank_id); await self.r.add_decision(QuestionReviewDecision(bank.project_id, reviewer, q.id, decision, reason, old, new)); return q
     async def copy_as_draft(self, version_id: UUID, actor: UUID) -> QuestionBankVersion:
@@ -83,7 +89,13 @@ class QuestionService:
         return new
     async def materialize_reported(self, project_id: UUID, reported: ReportedQuestion, version_id: UUID, idempotency_key: str) -> Question:
         if reported.project_id != project_id or reported.review_status is not ReviewStatus.HUMAN_APPROVED or not reported.source_evidence_link_ids: raise QuestionError("REPORTED_QUESTION_EVIDENCE_REQUIRED", "Approved direct reported-question evidence is required")
-        existing = await self.r.job_by_key(idempotency_key)
+        existing = await self.r.job_by_key(project_id, idempotency_key)
         if existing: raise QuestionError("IDEMPOTENCY_CONFLICT", "Materialization key already used")
-        q = Question(version_id, QuestionType.SHORT_ANSWER, reported.original_text or reported.normalized_text, {}, "Answer unresolved; human review required.", Difficulty.MEDIUM, QuestionBloomLevel.REMEMBER, OriginType(reported.origin_type), linked_reported_question_id=reported.id, source_evidence_link_ids=reported.source_evidence_link_ids)
-        await self.add_question(q); return q
+        question_id = uuid4()
+        citations = []
+        for evidence_link_id in reported.source_evidence_link_ids:
+            link = await self.r.get_evidence_link(evidence_link_id)
+            if not link or link.project_id != project_id: raise QuestionError("REPORTED_QUESTION_EVIDENCE_REQUIRED", "Reported-question evidence link is unavailable")
+            citations.append(QuestionCitation(question_id, link.id, link.source_id, link.source_snapshot_id, link.source_chunk_ids, link.claim_id, link.page_reference, link.section_reference, link.extracted_span))
+        q = Question(version_id, QuestionType.SHORT_ANSWER, reported.original_text or reported.normalized_text, {}, "Answer unresolved; human review required.", Difficulty.MEDIUM, QuestionBloomLevel.REMEMBER, OriginType(reported.origin_type), linked_reported_question_id=reported.id, source_evidence_link_ids=reported.source_evidence_link_ids, id=question_id)
+        await self.add_question(q, citations=citations); return q
