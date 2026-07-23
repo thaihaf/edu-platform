@@ -3,6 +3,7 @@
 ## Phase 8
 - Add framework-neutral validated assessment-question contracts, deterministic quality gates,
   question-bank drafts/publication, review history, and an asynchronous generation-job API boundary.
+- Complete project-scoped idempotency, meaningful non-choice answer/rubric validation, approval revocation, direct reported-evidence citations, independent-solver isolation, and ambiguity publication gates.
 
 All notable changes to this project are documented in this file.
 
