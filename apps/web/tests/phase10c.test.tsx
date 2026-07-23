@@ -50,6 +50,8 @@ describe("Phase 10C safety primitives", () => {
     expect(screen.getByLabelText("Metric regression")).toHaveTextContent(
       "-0.20",
     );
-    expect(screen.getByText("Incompatible metric version")).toBeVisible();
+    expect(screen.getByLabelText("Metric improvement")).toHaveTextContent(
+      "Incompatible metric version",
+    );
   });
 });

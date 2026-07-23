@@ -87,11 +87,7 @@ export type Claim = {
   updated_at: string;
 };
 export type ReviewDecision =
-  | "APPROVE"
-  | "REJECT"
-  | "REQUEST_CHANGES"
-  | "MARK_DISPUTED"
-  | "MARK_OBSOLETE";
+  "APPROVE" | "REJECT" | "REQUEST_CHANGES" | "MARK_DISPUTED" | "MARK_OBSOLETE";
 export const apiPaths = {
   project: (id: string) => `/projects/${id}`,
   sources: (id: string) => `/projects/${id}/sources`,
