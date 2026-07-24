@@ -4,6 +4,9 @@
 
 - Add a Phase 11 learner route group with development-only learner fixtures, learner-safe lesson
   and citation rendering, assessment disclosure states, flashcards, text interview, and skill UI.
+- Add Phase 12 production hardening boundaries for OTLP telemetry, Prometheus-compatible metrics,
+  scrubbed Sentry-compatible error reporting, bounded rate limiting, RBAC policy, operational
+  runbooks, security tests, and a k6 smoke scenario.
 
 ## Phase 8
 
