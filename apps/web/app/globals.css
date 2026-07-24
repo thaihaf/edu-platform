@@ -32,3 +32,26 @@ textarea {
     animation: none !important;
   }
 }
+
+.button {
+  display: inline-block;
+  border-radius: 0.25rem;
+  background: #1d4ed8;
+  color: white;
+  padding: 0.5rem 0.75rem;
+}
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+textarea:focus-visible {
+  outline: 3px solid #f59e0b;
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

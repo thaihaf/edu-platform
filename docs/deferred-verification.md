@@ -106,3 +106,11 @@ The frontend workflow explicitly installs from `apps/web/package-lock.json` with
 `npm --prefix apps/web ci`. It must not be reported as successful until that frozen install and its
 jobs run successfully. Its mocked browser job is separate (not deferred) and will install Chromium,
 run without Docker or a backend, and upload reports, screenshots, and traces on failure.
+# Phase 11 learner verification
+
+- Live PostgreSQL learner persistence and Alembic migration verification are deferred because Docker
+  and PostgreSQL are unavailable.
+- Real authentication/authorization, live API-to-browser learner flows, Redis/Celery asynchronous
+  grading, code/SQL sandboxing, and production deployment verification are deferred.
+- Mocked Playwright could not launch locally because the pinned Chromium binary is absent; an
+  attempted `playwright install chromium` received HTTP 403 from the configured CDN.

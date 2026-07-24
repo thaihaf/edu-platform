@@ -154,3 +154,11 @@ views. The remaining course-editor, question review/versioning, and evaluation/d
 baseline screens deliberately show typed availability states because the current FastAPI app does
 not expose their read/write contracts. The browser never invents records, validation results,
 publication outcomes, or evaluation results. See `docs/phase-notes/10c-course-question-evaluation-admin.md`.
+
+### Phase 11 learner web
+
+The same Next.js application now reserves `/learn` for the learner experience: dashboard, published
+course list/overview, safe lesson reader, practice/exam flows, results, flashcards, text mock
+interviews, and deterministic skill summaries. The development/test fixture is explicitly gated by
+`NEXT_PUBLIC_MOCK_MODE=true`; production routes display access-required/unavailable states until
+learner-safe FastAPI contracts are deployed. See `docs/phase-notes/11-learner-web.md`.

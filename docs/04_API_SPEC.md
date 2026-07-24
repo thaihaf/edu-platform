@@ -141,3 +141,11 @@ reads before they can provide project/research-job lists, dashboard aggregates, 
 and fetch administration, source-cluster reads, reported-question reads, skill/prerequisite reads,
 and knowledge-gap reads. The UI shows a typed unavailable state for those contracts; it does not
 mock production data or reproduce backend policy.
+
+## Phase 11 learner API policy
+
+The planned `/learner` endpoints serve published learner-safe course/version/lesson reads, progress,
+practice/exam sessions, flashcards, interviews, and skills. They must enforce learner ownership and
+return structured errors with trace IDs. Until those endpoints are implemented, the web application
+uses deterministic fixtures only in explicit mock mode and otherwise shows an unavailable/access
+state; it does not call invented production endpoints.

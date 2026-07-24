@@ -1,4 +1,4 @@
-# Phase 10 administrative web
+# Administrative and learner web
 
 This is the strict-TypeScript Next.js App Router administrator studio. It is not a learner
 application. It is an isolated npm project: its sole authoritative lockfile is
@@ -15,6 +15,16 @@ runs `npm --prefix apps/web run format:check`, `npm --prefix apps/web run lint`,
 The smoke suite starts the production build and uses `NEXT_PUBLIC_MOCK_MODE=true`, so it neither
 requires Docker nor a live backend. Browser reports, screenshots, and traces are uploaded when the
 browser job fails.
+
+## Phase 11 learner boundary
+
+Learner routes live under `/learn` in a dedicated route group and use a learner-only shell;
+admin routes remain unchanged. In this baseline, the FastAPI learner contracts are not yet live,
+so deterministic fixtures render **only** with `NEXT_PUBLIC_MOCK_MODE=true` (development/test).
+All other modes show an access-required state and do not fabricate progress or content. Fixture
+contracts intentionally omit answer keys, `is_correct`, reviewer notes, prompts, credentials,
+and raw evidence identifiers. Lesson blocks are rendered as text/React structure only; external
+citations accept only `http`/`https` URLs and use `noopener noreferrer`.
 
 See `../../docs/phase-notes/10-frontend-ci-verification.md` for verification status and
 `../../docs/deferred-verification.md` for remaining live-infrastructure checks.

@@ -73,3 +73,9 @@ positions, approved claim/skill linkage, and no executable content before public
 Metric name, version and configuration hash identify a result. Deterministic validators own hard safety
 gates; optional DeepEval/model judges are advisory. Golden datasets, policies, baselines and append-only
 results make regression decisions reproducible and CI runs use deterministic fixtures only.
+
+## Phase 11 learner feedback
+
+Objective answers are evaluated only after submission. Essay/interview feedback is explicitly
+provisional/model-assisted where applicable. Exam review waits until terminal submission. Skill
+labels use a versioned deterministic policy and do not assert validated psychometric mastery.
