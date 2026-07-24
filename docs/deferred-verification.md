@@ -60,6 +60,17 @@ Offline PostgreSQL Alembic SQL generation and static Compose YAML parsing remain
 | Mocked browser smoke               | Playwright dependencies cannot be installed without package registry                                                                                    | e2e         | `make web-e2e-mock` after `make web-install`                                                                        |
 | Deployment production build        | frontend dependencies unavailable locally                                                                                                               | build       | `make web-build` in CI/deployment environment                                                                       |
 
+## Phase 12 production hardening
+
+| Check/category | Reason | Type | Later execution |
+| --- | --- | --- | --- |
+| OpenTelemetry collector export | No collector or production credentials are configured; the local adapter is unit tested. | infrastructure | Deploy an OTLP collector and verify traces, resource attributes, sampling, and redaction. |
+| Sentry-compatible hosted delivery | No Sentry-compatible service or DSN is configured. | infrastructure | Configure a managed secret DSN, trigger a synthetic sanitized exception, and verify no sensitive fields arrive. |
+| Redis/shared gateway rate limits | Docker/Redis and an ingress gateway are unavailable. | infrastructure | Run a multi-replica burst test against the deployment's shared limiter. |
+| Backup/restore and disaster recovery | PostgreSQL/object storage and a separate recovery environment are unavailable. | operational | Execute the documented encrypted backup restore and DR exercise; record measured RPO/RTO. |
+| k6 load scenario | k6 is not installed in this environment. | load | `k6 run -e BASE_URL=https://<deployment> load/phase12-smoke.js` in an approved test environment. |
+| Mocked Playwright browser smoke | The Playwright Chromium headless-shell executable is absent at `/root/.cache/ms-playwright/chromium_headless_shell-1228/chrome-headless-shell-linux64/chrome-headless-shell`. GitHub Codespaces manually verified `npm --prefix apps/web run e2e:mock` on latest main. | e2e | Install the pinned Playwright Chromium executable in an approved browser-enabled runner, then rerun `npm --prefix apps/web run e2e:mock`. |
+
 | Phase 10B paginated dashboard and administration lists | documented FastAPI list/aggregate contracts are absent | API integration | add narrow read-only contracts for projects, jobs, search/fetch, clusters, questions, skills, and gaps; then add MSW/browser coverage |
 | Phase 10B component, MSW, and Playwright coverage | frontend dependencies unavailable locally | frontend tests | run `npm --prefix apps/web run test` and `npm --prefix apps/web run e2e:mock` after installing dependencies |
 

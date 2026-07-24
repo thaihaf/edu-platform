@@ -7,7 +7,7 @@ from uuid import UUID, uuid4
 
 import structlog
 from fastapi import BackgroundTasks, FastAPI, Request, Response, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel, Field
 from starlette.middleware.base import BaseHTTPMiddleware, RequestResponseEndpoint
 
@@ -49,6 +49,14 @@ from packages.application.questions import QuestionService, fingerprint as quest
 from packages.domain.question import QuestionError, QuestionGenerationJob, QuestionType
 from packages.infrastructure.question import InMemoryQuestionRepository
 from packages.infrastructure.settings import Settings, get_settings
+from packages.infrastructure.production import (
+    Metrics,
+    NullErrorReporter,
+    SentryCompatibleErrorReporter,
+    SlidingWindowRateLimiter,
+    client_key,
+    configure_opentelemetry,
+)
 
 logger = structlog.get_logger(__name__)
 
@@ -67,6 +75,29 @@ class TraceIdMiddleware(BaseHTTPMiddleware):
             structlog.contextvars.clear_contextvars()
 
 
+class ProductionHardeningMiddleware(BaseHTTPMiddleware):
+    """Apply bounded rate limits and record privacy-safe request telemetry."""
+
+    def __init__(self, app: Any, limiter: SlidingWindowRateLimiter, metrics: Metrics) -> None:
+        super().__init__(app)
+        self.limiter, self.metrics = limiter, metrics
+
+    async def dispatch(self, request: Request, call_next: RequestResponseEndpoint) -> Response:
+        started = __import__("time").monotonic()
+        if request.url.path not in {
+            "/health/live",
+            "/health/ready",
+            "/metrics",
+        } and not self.limiter.allow(client_key(request.client.host if request.client else None)):
+            self.metrics.rate_limit_rejections_total += 1
+            return JSONResponse(status_code=429, content={"error": {"code": "RATE_LIMITED"}})
+        response = await call_next(request)
+        self.metrics.record_request(
+            request.method, response.status_code, __import__("time").monotonic() - started
+        )
+        return response
+
+
 def create_app(
     settings: Settings | None = None,
     probes: dict[str, ReadinessProbe] | None = None,
@@ -75,10 +106,25 @@ def create_app(
 
     runtime_settings = settings or get_settings()
     configure_logging(runtime_settings.log_level)
+    configure_opentelemetry(
+        runtime_settings.service_name, runtime_settings.otel_exporter_otlp_endpoint
+    )
     readiness_probes = probes if probes is not None else create_readiness_probes(runtime_settings)
+    metrics = Metrics()
+    limiter = SlidingWindowRateLimiter(
+        runtime_settings.rate_limit_requests, runtime_settings.rate_limit_window_seconds
+    )
+    reporter = (
+        SentryCompatibleErrorReporter(runtime_settings.sentry_dsn)
+        if runtime_settings.sentry_dsn
+        else NullErrorReporter()
+    )
 
     @asynccontextmanager
     async def lifespan(_: FastAPI) -> AsyncIterator[None]:
+        missing = runtime_settings.production_errors()
+        if missing:
+            raise RuntimeError("Missing production hardening configuration: " + ", ".join(missing))
         yield
 
     app = FastAPI(
@@ -88,6 +134,12 @@ def create_app(
         lifespan=lifespan,
     )
     app.add_middleware(TraceIdMiddleware)
+    app.add_middleware(ProductionHardeningMiddleware, limiter=limiter, metrics=metrics)
+
+    @app.exception_handler(Exception)
+    async def report_unhandled(request: Request, exc: Exception) -> JSONResponse:
+        reporter.capture_exception(exc, trace_id=request.headers.get("X-Trace-ID", ""))
+        return JSONResponse(status_code=500, content={"error": {"code": "INTERNAL_ERROR"}})
 
     @app.get("/health/live", tags=["health"])
     async def live() -> dict[str, str]:
@@ -109,6 +161,14 @@ def create_app(
                 content={"status": "not_ready", "unavailable": unavailable},
             )
         return JSONResponse(content={"status": "ok"})
+
+    @app.get("/metrics", include_in_schema=False)
+    async def prometheus_metrics(request: Request) -> Response:
+        if runtime_settings.app_env == "production" and request.headers.get("Authorization") != (
+            f"Bearer {runtime_settings.metrics_token}"
+        ):
+            return Response(status_code=status.HTTP_404_NOT_FOUND)
+        return PlainTextResponse(metrics.prometheus(), media_type="text/plain; version=0.0.4")
 
     return app
 
