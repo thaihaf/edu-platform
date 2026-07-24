@@ -107,3 +107,6 @@ ignore_errors = true
 [[tool.mypy.overrides]]
 module = ["packages.domain.evaluation", "packages.application.evaluation", "packages.application.eval_cli", "packages.infrastructure.evaluation", "tests.test_evaluation_phase9", "alembic.versions.0008_phase9_evaluation"]
 ignore_errors = true
+
+[tool.vercel]
+entrypoint = "apps.api.app.main:app"
