@@ -1,4 +1,5 @@
-export type Role = "ADMIN" | "RESEARCHER" | "REVIEWER" | "EDITOR" | "VIEWER";
+export type Role =
+  "ADMIN" | "RESEARCHER" | "REVIEWER" | "EDITOR" | "VIEWER" | "LEARNER";
 export type CurrentUser = {
   id: string;
   name: string;

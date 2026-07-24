@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Add a Phase 11 learner route group with development-only learner fixtures, learner-safe lesson
+  and citation rendering, assessment disclosure states, flashcards, text interview, and skill UI.
+
 ## Phase 8
 
 - Add framework-neutral validated assessment-question contracts, deterministic quality gates,

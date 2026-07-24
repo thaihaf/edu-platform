@@ -95,3 +95,10 @@ Phase 10B renders source and claim text as React text nodes and does not use
 storage credential, authentication token, or raw model payload is exposed. Mutations retain the
 FastAPI structured error envelope and trace ID without logging credentials. Text ingestion and
 evidence-building mutations send idempotency keys when the API requires them.
+
+## Phase 11 learner safeguards
+
+Learner rendering treats lesson Markdown and diagram specifications as text/approved React structure;
+it never executes HTML, code, or SQL. Citation links permit only HTTP(S) and use safe external-link
+attributes. Pre-submission learner contracts exclude correct-answer flags and reviewer/generation
+metadata. Backend learner endpoints must enforce ownership to prevent IDOR.

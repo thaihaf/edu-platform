@@ -122,3 +122,10 @@ not inserted as HTML; JSON validation parses but never evaluates values. Externa
 navigation will be limited to safe links with `rel="noopener noreferrer"` once citation records are
 available. No provider credentials, raw prompts, storage paths, or hidden answer metadata are
 placed in browser state.
+
+## Phase 11 learner UI
+
+`/learn` has a learner-only shell with course, practice, exam, flashcard, interview, and progress
+navigation. Lesson readers preserve heading hierarchy, render unsafe content as text, provide
+completion/navigation controls, and expose safe citations. Controls use semantic labels, visible
+focus, native progress/form controls, status announcements, and reduced-motion styling.

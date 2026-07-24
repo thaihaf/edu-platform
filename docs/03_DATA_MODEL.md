@@ -150,3 +150,12 @@ skill, claim and evidence linkage; duplicate clusters preserve rather than delet
 Evaluation runs preserve their dataset/artifact scope, metric versions/configuration, budgets, lifecycle,
 per-case append-only results, aggregates and gate decision. Golden datasets and quality-gate policies are
 versioned: published dataset/policy versions are immutable. Baselines compare only identical metric versions.
+
+## Phase 11 learning model
+
+`LearnerCourseProgress` and `LearnerLessonProgress` are scoped by learner and immutable published
+course version. `LearningSession` pins optional course and required published question-bank version,
+question ordering, mode, lifecycle, and scoring-policy version. `QuestionAttempt` is learner/session/
+question scoped with an idempotency constraint; learner-safe pre-submission views never include an
+answer key. Flashcard state is limited to `NEW`, `REVIEW`, and `MASTERED`; skill summaries are
+calculated deterministically from completed attempts.
